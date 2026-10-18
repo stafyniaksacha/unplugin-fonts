@@ -73,25 +73,39 @@ export function customVirtualModule(userOptions: CustomFonts, root: string) {
   return css.join('\n')
 }
 
-export function customLoader(userOptions: CustomFonts, root: string) {
+/**
+ * Whether a font file is served as-is from the public directory, i.e. its path
+ * relative to the root starts with `stripPrefix`. Other files go through the bundler.
+ */
+export function isPublicFontFile(file: string, options: ResolvedCustomFonts, root: string) {
+  return relative(root, file).startsWith(options.stripPrefix)
+}
+
+const warnedPreloadAndPrefetch = new WeakSet<CustomFonts>()
+
+/**
+ * `<link>` tags preloading the custom fonts served from the public directory.
+ * Bundled fonts get hashed file names, so they are linked once the bundle is known.
+ */
+export function customLoader(userOptions: CustomFonts, root: string, base = '/') {
   const options = resolveUserOption(userOptions)
+
+  // --- We can not do a prefetch and a preload for the same files.
+  // Links are generated for every page (and every dev request): warn once per configuration.
+  if (options.preload && options.prefetch && !warnedPreloadAndPrefetch.has(userOptions)) {
+    warnedPreloadAndPrefetch.add(userOptions)
+    console.warn('unplugin-fonts: Prefetch and a Preload options can not be used together.\n'
+      + 'unplugin-fonts: The prefetch stand for a lower priority for the resource (maybe we will need it in a future page) whereas preload is for the current page, so we can not have both.')
+  }
+  if (!options.preload && !options.prefetch)
+    return []
 
   const tags: HtmlTagDescriptor[] = []
 
   // --- Iterate over font families and their faces.
   for (const family of options.families) {
-    const faces = resolveFontFiles(family, options, root)
-
-    // --- We can not do a prefetch and a preload for the same files.
-    if (options.preload && options.prefetch) {
-      console.warn('unplugin-fonts: Prefetch and a Preload options can not be used together.')
-      console.warn('unplugin-fonts: The prefetch stand for a lower priority for the resource (maybe we will need it in a future page) whereas preload is for the current page, so we can not have both.')
-    }
-    if (options.preload || options.prefetch) {
-      // --- Generate `<link>` tags.
-      for (const face of faces)
-        tags.push(...createFontLinks(options, face))
-    }
+    for (const face of resolveFontFiles(family, options, root))
+      tags.push(...createFontLinks(options, face, root, base))
   }
 
   return tags
@@ -257,21 +271,22 @@ function generateFontCSS(face: CustomFontFace) {
   ].join('\n')
 }
 
-function createFontLinks(options: ResolvedCustomFonts, face: CustomFontFace) {
-  const links: HtmlTagDescriptor[] = []
+function createFontLinks(options: ResolvedCustomFonts, face: CustomFontFace, root: string, base: string): HtmlTagDescriptor[] {
+  // One preload per face: its first @font-face source, which is the one browsers
+  // download. Faces whose first source is bundled are linked from the bundle.
+  const [file] = face.files
+  if (!file || !isPublicFontFile(file.src, options, root))
+    return []
 
-  for (const file of face.files) {
-    links.push({
-      tag: 'link',
-      injectTo: options.injectTo,
-      attrs: {
-        rel: options.prefetch ? 'prefetch' : 'preload',
-        as: 'font',
-        type: `font/${file.ext.replace('.', '')}`,
-        href: join(options.prefetchPrefix, file.path),
-        crossorigin: true,
-      },
-    })
-  }
-  return links
+  return [{
+    tag: 'link',
+    injectTo: options.injectTo,
+    attrs: {
+      rel: options.prefetch ? 'prefetch' : 'preload',
+      as: 'font',
+      type: `font/${file.ext.replace('.', '')}`,
+      href: joinURL(options.prefetchPrefix || base, file.path),
+      crossorigin: 'anonymous',
+    },
+  }]
 }

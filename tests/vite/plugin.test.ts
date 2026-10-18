@@ -1,3 +1,4 @@
+import type { HtmlTagDescriptor } from 'vite'
 import { globSync } from 'tinyglobby'
 import { describe, expect, it, vi } from 'vitest'
 import { googleLoader } from '../../src/loaders/google-fonts.js'
@@ -39,6 +40,34 @@ describe('plugin', () => {
         styles: '@import "@fontsource/inter/index.css";',
       })
       expect(map).toBeUndefined()
+    })
+
+    it.each([
+      ['an array', (tags: HtmlTagDescriptor[]) => tags.filter(tag => tag.attrs?.as === 'font'), ['/fonts/MyFont-Bold.woff2']],
+      ['false', () => false, []],
+    ])('applies linkFilter returning %s to the head links', async (_, linkFilter, hrefs) => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      const p = getVitePlugin({
+        google: { families: ['Roboto'] },
+        custom: { families: [{ name: 'MyFont', src: 'public/fonts/*' }], linkFilter },
+      })
+
+      const { links } = moduleExports((await loadModule(p, 'unplugin-fonts/head')).code)
+
+      expect(links.map((link: HtmlTagDescriptor) => link.attrs?.href)).toEqual(hrefs)
+    })
+
+    it('includes preload links for custom fonts served from the public directory', async () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      const p = getVitePlugin({ custom: { families: [{ name: 'MyFont', src: 'public/fonts/*' }] } }, { base: '/docs/' })
+
+      const { links } = moduleExports((await loadModule(p, 'unplugin-fonts/head')).code)
+
+      expect(links).toEqual([{
+        tag: 'link',
+        injectTo: 'head-prepend',
+        attrs: { rel: 'preload', as: 'font', type: 'font/woff2', href: '/docs/fonts/MyFont-Bold.woff2', crossorigin: 'anonymous' },
+      }])
     })
   })
 

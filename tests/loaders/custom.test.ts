@@ -261,18 +261,51 @@ describe('custom fonts loader', () => {
   })
 
   describe('link tag generation', () => {
-    it('generates preload link tags for font files', () => {
-      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/Roboto-Bold.woff2'])
+    it('preloads the first @font-face source of each public font face', () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/Roboto-Bold.woff', '/root/public/fonts/Roboto-Bold.woff2'])
 
       const tags = customLoader(
         { families: [{ name: 'Roboto', src: 'public/fonts/Roboto-Bold.*' }] },
         '/root',
       )
 
-      expect(tags).toHaveLength(1)
-      expect(tags[0]!.attrs?.rel).toBe('preload')
-      expect(tags[0]!.attrs?.as).toBe('font')
-      expect(tags[0]!.attrs?.type).toBe('font/woff2')
+      expect(tags).toEqual([{
+        tag: 'link',
+        injectTo: 'head-prepend',
+        attrs: { rel: 'preload', as: 'font', type: 'font/woff2', href: '/fonts/Roboto-Bold.woff2', crossorigin: 'anonymous' },
+      }])
+    })
+
+    it('preloads the first source set by transform', () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/Roboto-Bold.woff', '/root/public/fonts/Roboto-Bold.woff2'])
+
+      const tags = customLoader({
+        families: [{
+          name: 'Roboto',
+          src: 'public/fonts/*',
+          transform(face) {
+            face.files.reverse()
+            return face
+          },
+        }],
+      }, '/root')
+
+      expect(tags.map(tag => tag.attrs?.href)).toEqual(['/fonts/Roboto-Bold.woff'])
+    })
+
+    it('leaves fonts outside the public directory to the bundler', () => {
+      vi.mocked(globSync).mockReturnValue(['/root/src/assets/fonts/Roboto-Bold.woff2'])
+
+      expect(customLoader({ families: [{ name: 'Roboto', src: 'src/assets/fonts/*' }] }, '/root')).toEqual([])
+    })
+
+    it('prefixes links with the base, unless prefetchPrefix is set', () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/Roboto-Bold.woff2'])
+      const families = [{ name: 'Roboto', src: 'public/fonts/*' }]
+
+      expect(customLoader({ families }, '/root', '/app/')[0]!.attrs?.href).toBe('/app/fonts/Roboto-Bold.woff2')
+      expect(customLoader({ families, prefetchPrefix: 'https://cdn.example.com/' }, '/root', '/app/')[0]!.attrs?.href)
+        .toBe('https://cdn.example.com/fonts/Roboto-Bold.woff2')
     })
 
     it('generates prefetch link tags when prefetch is enabled', () => {
@@ -286,16 +319,39 @@ describe('custom fonts loader', () => {
       expect(tags[0]!.attrs?.rel).toBe('prefetch')
     })
 
-    it('warns when both preload and prefetch are enabled together', () => {
+    it('generates nothing when both preload and prefetch are disabled', () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/Roboto-Bold.woff2'])
+
+      expect(customLoader({ families: [{ name: 'Roboto', src: 'public/fonts/*' }], preload: false }, '/root')).toEqual([])
+    })
+
+    it('warns once when both preload and prefetch are enabled together', () => {
       vi.mocked(globSync).mockReturnValue(['/root/public/fonts/Roboto-Bold.woff2'])
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
       customLoader(
-        { families: [{ name: 'Roboto', src: 'public/fonts/Roboto-Bold.*' }], preload: true, prefetch: true },
+        {
+          families: [{ name: 'Roboto', src: 'public/fonts/*' }, { name: 'Lato', src: 'public/fonts/*' }],
+          preload: true,
+          prefetch: true,
+        },
         '/root',
       )
 
-      expect(warn).toHaveBeenCalled()
+      expect(warn).toHaveBeenCalledTimes(1)
+    })
+
+    it('warns once per configuration, however often links are generated', () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/Roboto-Bold.woff2'])
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const options = { families: [{ name: 'Roboto', src: 'public/fonts/*' }], preload: true, prefetch: true }
+
+      for (let page = 0; page < 3; page++)
+        customLoader(options, '/root')
+      expect(warn).toHaveBeenCalledTimes(1)
+
+      customLoader({ ...options }, '/root')
+      expect(warn).toHaveBeenCalledTimes(2)
     })
   })
 })
