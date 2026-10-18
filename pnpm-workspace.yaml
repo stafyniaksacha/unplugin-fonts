@@ -12,7 +12,6 @@ trustPolicyExclude:
   - undici@5.29.0
   - vite@4.5.14
   - vite@5.4.21
-  - vite@6.4.1
 trustPolicyExcludePrune: true
 shellEmulator: true
 
@@ -24,4 +23,7 @@ catalogs:
     '@fontsource/abeezee': ^5.2.8
     '@fontsource/truculenta': ^5.2.7
   shared:
-    typescript: ^6.0.2
+    typescript: ^6.0.3
+allowBuilds:
+  esbuild: true
+  sharp: true
