@@ -1,17 +1,18 @@
-import type { Options } from './types'
+import type {} from '@nuxt/schema'
+import type { Options } from './types.js'
 import { addTemplate, addVitePlugin, addWebpackPlugin, defineNuxtModule } from '@nuxt/kit'
-import unplugin from './index'
-import { getHeadLinkTags } from './loaders'
-import { customVirtualModule } from './loaders/custom'
-import { generateAllFallbacks, hasFallbacks } from './loaders/fallback'
-import { fontsourceImports } from './loaders/fontsource'
+import unplugin from './index.js'
+import { customVirtualModule } from './loaders/custom.js'
+import { generateAllFallbacks, hasFallbacks } from './loaders/fallback.js'
+import { fontsourceImports } from './loaders/fontsource.js'
+import { getHeadLinkTags } from './loaders/index.js'
 
-export default defineNuxtModule({
+export default defineNuxtModule<Options>({
   meta: {
     name: 'unplugin-fonts',
     configKey: 'unfonts',
   },
-  setup(options: Options, nuxt) {
+  setup(options, nuxt) {
     const needsCSSTemplate = 'fontsource' in options || 'custom' in options || hasFallbacks(options)
 
     if (needsCSSTemplate) {

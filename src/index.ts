@@ -1,11 +1,11 @@
-import type { CustomFonts, Options } from './types'
+import type { CustomFonts, Options } from './types.js'
 import MagicString from 'magic-string'
 import { basename as _basename, extname, join } from 'pathe'
 import { createUnplugin } from 'unplugin'
-import { getHeadLinkTags } from './loaders'
-import { customVirtualModule, resolveFontFiles, resolveUserOption } from './loaders/custom'
-import { collectFallbackNames, generateAllFallbacks, transformFontFamilyDeclarations } from './loaders/fallback'
-import { fontsourceImports, fontsourceVirtualModule } from './loaders/fontsource'
+import { customVirtualModule, resolveFontFiles, resolveUserOption } from './loaders/custom.js'
+import { collectFallbackNames, generateAllFallbacks, transformFontFamilyDeclarations } from './loaders/fallback.js'
+import { fontsourceImports, fontsourceVirtualModule } from './loaders/fontsource.js'
+import { getHeadLinkTags } from './loaders/index.js'
 
 const virtualStylesId = 'unfonts.css'
 const resolvedVirtualStylesId = `\0${virtualStylesId}`

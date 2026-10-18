@@ -1,4 +1,4 @@
-import type { FontsourceFonts } from '../types'
+import type { FontsourceFonts } from '../types.js'
 
 export function fontsourceImports(options?: FontsourceFonts) {
   const source: string[] = []

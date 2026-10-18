@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { build } from 'vite'
 import { describe, expect, it } from 'vitest'
-import Unfonts from '../../src/vite'
+import Unfonts from '../../src/vite.js'
 
 describe('google Fonts text subsetting in built HTML', () => {
   it.each([true, false])('preserves URL-significant characters with defer = %s', async (defer) => {

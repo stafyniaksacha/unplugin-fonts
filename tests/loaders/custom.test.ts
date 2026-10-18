@@ -1,9 +1,9 @@
 import { globSync } from 'tinyglobby'
 
 import { describe, expect, it, vi } from 'vitest'
-import { customLoader, customVirtualModule } from '../../src/loaders/custom'
+import { customLoader, customVirtualModule } from '../../src/loaders/custom.js'
 
-vi.mock('tinyglobby', () => import('../mocks/tinyglobby'))
+vi.mock('tinyglobby', () => import('../mocks/tinyglobby.js'))
 
 describe('custom fonts loader', () => {
   describe('cSS generation', () => {

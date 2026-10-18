@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { googleLoader } from '../../src/loaders/google-fonts'
+import { googleLoader } from '../../src/loaders/google-fonts.js'
 
 describe('google fonts loader', () => {
   it('warns and produces nothing when no font families are given', () => {

@@ -1,6 +1,6 @@
 import type { AstroIntegration } from 'astro'
-import type { Options } from './types'
-import unplugin from '.'
+import type { Options } from './types.js'
+import unplugin from './index.js'
 
 export default function (options: Options) {
   return <AstroIntegration>{

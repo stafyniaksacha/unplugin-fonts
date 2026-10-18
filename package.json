@@ -88,7 +88,7 @@
     "test": "pnpm run test:vitest && pnpm run test:lint && pnpm run test:ts",
     "test:vitest": "vitest run",
     "test:lint": "eslint .",
-    "test:ts": "tsgo --noEmit",
+    "test:ts": "tsc",
     "release": "pnpm run test && npx standard-version && git push --follow-tags origin main && pnpm publish"
   },
   "peerDependencies": {
@@ -119,7 +119,7 @@
     "@nuxt/schema": "^4.6.2",
     "@types/css-tree": "^3.2.0",
     "@types/node": "^26.6.5",
-    "@typescript/native-preview": "7.0.0-dev.20260406.1",
+    "@typescript/native": "npm:typescript@^7.0.2",
     "astro": "^7.4.0",
     "chalk": "^6.0.1",
     "defu": "^6.1.7",
@@ -129,7 +129,7 @@
     "rollup": "^4.64.7",
     "standard-version": "^9.5.0",
     "tsdown": "^0.23.1",
-    "typescript": "catalog:shared",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
     "vite": "^8.3.4",
     "vitest": "^5.0.5",
     "webpack": "^5.112.0"

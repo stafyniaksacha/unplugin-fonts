@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { build } from 'vite'
 import { expect, it } from 'vitest'
-import Unfonts from '../../src/vite'
+import Unfonts from '../../src/vite.js'
 
 it('generates fallbacks from installed Fontsource files missing from the metrics database', async () => {
   const root = await mkdtemp(fileURLToPath(new URL('./fontsource-fixture-', import.meta.url)))

@@ -1,5 +1,5 @@
 import type { HtmlTagDescriptor } from 'vite'
-import type { TypeKitFonts } from '../types'
+import type { TypeKitFonts } from '../types.js'
 
 export function typekitLoader({
   id,

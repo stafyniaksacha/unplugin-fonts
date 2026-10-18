@@ -1,15 +1,16 @@
 {
   "compilerOptions": {
     "target": "esnext",
-    "lib": ["es2023", "DOM"],
+    "lib": ["es2023"],
     "moduleDetection": "force",
-    "module": "preserve",
-    "moduleResolution": "bundler",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "resolveJsonModule": true,
+    "types": ["node"],
     "strict": true,
-    "strictNullChecks": true,
+    "noFallthroughCasesInSwitch": true,
     "declaration": true,
-    "esModuleInterop": true,
+    "noEmit": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
   },

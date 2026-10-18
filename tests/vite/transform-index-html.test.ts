@@ -1,10 +1,10 @@
 import type { HtmlTagDescriptor } from 'vite'
 import { globSync } from 'tinyglobby'
 import { describe, expect, it, vi } from 'vitest'
-import plugin from '../../src/index'
+import plugin from '../../src/index.js'
 
-vi.mock('tinyglobby', () => import('../mocks/tinyglobby'))
-vi.mock('fontaine', () => import('../mocks/fontaine'))
+vi.mock('tinyglobby', () => import('../mocks/tinyglobby.js'))
+vi.mock('fontaine', () => import('../mocks/fontaine.js'))
 
 function createBundle(entries: Record<string, { type: string, source?: string, fileName: string, originalFileNames?: string[], name?: string }>) {
   return entries

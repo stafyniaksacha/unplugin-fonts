@@ -1,5 +1,5 @@
-import type { CustomFontFamily, FontFallbackConfig, Options } from '../types'
-import type { ResolvedCustomFonts } from './custom'
+import type { CustomFontFamily, FontFallbackConfig, Options } from '../types.js'
+import type { ResolvedCustomFonts } from './custom.js'
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
@@ -13,8 +13,8 @@ import {
   resolveCategoryFallbacks,
 } from 'fontaine'
 import MagicString from 'magic-string'
-import { resolveFontFiles, resolveUserOption } from './custom'
-import { fontsourceImports } from './fontsource'
+import { resolveFontFiles, resolveUserOption } from './custom.js'
+import { fontsourceImports } from './fontsource.js'
 
 const VARIABLE_SUFFIX_RE = /(?: Variable|-variable)$/
 const CSS_RE = /\.(?:css|scss|sass|less|styl|stylus|pcss|postcss)(?:\?.*)?$/

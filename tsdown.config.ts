@@ -10,7 +10,7 @@ export default defineConfig({
   },
   dts: false,
   unbundle: true,
-  onSuccess: 'pnpm tsgo -p ./tsconfig.build.json',
+  onSuccess: 'pnpm tsc -p ./tsconfig.build.json',
   deps: {
     neverBundle: ['@nuxt/schema', '@nuxt/kit'],
   },

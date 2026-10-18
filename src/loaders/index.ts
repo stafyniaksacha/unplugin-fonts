@@ -1,8 +1,8 @@
 import type { HtmlTagDescriptor } from 'vite'
-import type { Options } from '../types'
-import { googleLoader } from './google-fonts'
-// import { customLoader } from './custom'
-import { typekitLoader } from './typekit'
+import type { Options } from '../types.js'
+import { googleLoader } from './google-fonts.js'
+// import { customLoader } from './custom.js'
+import { typekitLoader } from './typekit.js'
 
 export function getHeadLinkTags(resolvedOptions: Options) {
   const tags: HtmlTagDescriptor[] = []

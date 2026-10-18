@@ -1,5 +1,5 @@
 import type { HtmlTagDescriptor } from 'vite'
-import type { CustomFontFace, CustomFontFamily, CustomFonts } from '../types'
+import type { CustomFontFace, CustomFontFamily, CustomFonts } from '../types.js'
 import { basename as _basename, extname, join, relative } from 'pathe'
 import { globSync } from 'tinyglobby'
 

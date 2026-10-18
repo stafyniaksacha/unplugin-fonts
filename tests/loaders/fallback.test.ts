@@ -1,9 +1,9 @@
 import { globSync } from 'tinyglobby'
 import { describe, expect, it, vi } from 'vitest'
-import { collectFallbackNames, generateAllFallbacks, transformFontFamilyDeclarations } from '../../src/loaders/fallback'
+import { collectFallbackNames, generateAllFallbacks, transformFontFamilyDeclarations } from '../../src/loaders/fallback.js'
 
-vi.mock('tinyglobby', () => import('../mocks/tinyglobby'))
-vi.mock('fontaine', () => import('../mocks/fontaine'))
+vi.mock('tinyglobby', () => import('../mocks/tinyglobby.js'))
+vi.mock('fontaine', () => import('../mocks/fontaine.js'))
 
 describe('fallback font generation', () => {
   describe('custom fonts', () => {
@@ -52,7 +52,7 @@ describe('fallback font generation', () => {
     it('uses custom fallback name when provided', async () => {
       vi.mocked(globSync).mockReturnValue(['/root/public/fonts/Roboto-Regular.woff2'])
 
-      const { generateFontFace } = await import('../../src/../tests/mocks/fontaine')
+      const { generateFontFace } = await import('../../src/../tests/mocks/fontaine.js')
       generateFontFace.mockClear()
 
       await generateAllFallbacks(
@@ -77,7 +77,7 @@ describe('fallback font generation', () => {
     it('uses explicit fallback fonts when provided', async () => {
       vi.mocked(globSync).mockReturnValue(['/root/public/fonts/Roboto-Regular.woff2'])
 
-      const { getMetricsForFamily, generateFontFace } = await import('../../src/../tests/mocks/fontaine')
+      const { getMetricsForFamily, generateFontFace } = await import('../../src/../tests/mocks/fontaine.js')
       generateFontFace.mockClear()
       getMetricsForFamily.mockClear()
 
@@ -179,7 +179,7 @@ describe('fallback font generation', () => {
     })
 
     it('strips Variable suffix from fontsource family names', async () => {
-      const { getMetricsForFamily } = await import('../../src/../tests/mocks/fontaine')
+      const { getMetricsForFamily } = await import('../../src/../tests/mocks/fontaine.js')
       getMetricsForFamily.mockClear()
 
       await generateAllFallbacks(
@@ -371,7 +371,7 @@ describe('fallback font generation', () => {
   describe('graceful degradation', () => {
     it('warns and skips when metrics cannot be resolved', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const { getMetricsForFamily, readMetrics } = await import('../../src/../tests/mocks/fontaine')
+      const { getMetricsForFamily, readMetrics } = await import('../../src/../tests/mocks/fontaine.js')
 
       getMetricsForFamily.mockResolvedValueOnce(null)
       readMetrics.mockRejectedValueOnce(new Error('not found'))

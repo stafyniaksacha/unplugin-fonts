@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { typekitLoader } from '../../src/loaders/typekit'
+import { typekitLoader } from '../../src/loaders/typekit.js'
 
 describe('typekit loader', () => {
   it('warns and produces nothing when no kit ID is provided', () => {

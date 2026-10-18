@@ -1,5 +1,5 @@
 import type { HtmlTagDescriptor } from 'vite'
-import type { GoogleFonts } from '../types'
+import type { GoogleFonts } from '../types.js'
 
 export function googleLoader({
   families,

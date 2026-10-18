@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fontsourceImports, fontsourceVirtualModule } from '../../src/loaders/fontsource'
+import { fontsourceImports, fontsourceVirtualModule } from '../../src/loaders/fontsource.js'
 
 describe('fontsource loader', () => {
   it('produces nothing with no configuration', () => {
