@@ -47,6 +47,16 @@ function normalizeDirectoryPrefix(prefix: string) {
   return normalized && !normalized.endsWith('/') ? `${normalized}/` : normalized
 }
 
+/**
+ * Join a URL prefix (`/`, `/sub`, `./` or `https://cdn.example.com/`) and a path.
+ * Unlike a filesystem join, it keeps `scheme://` intact.
+ */
+export function joinURL(base: string, path: string) {
+  if (!base)
+    return path
+  return `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`
+}
+
 export function customVirtualModule(userOptions: CustomFonts, root: string) {
   const options = resolveUserOption(userOptions)
 
