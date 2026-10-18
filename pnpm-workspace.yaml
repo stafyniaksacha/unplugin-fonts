@@ -1,4 +1,5 @@
 minimumReleaseAgeExcludePrune: true
+
 trustPolicy: no-downgrade
 # Releases on an older major published after a newer major gained stronger
 # trust evidence. Verified 2026-10-17: lockfile integrity matches the registry
@@ -13,10 +14,15 @@ trustPolicyExclude:
   - vite@4.5.14
   - vite@5.4.21
 trustPolicyExcludePrune: true
+
 shellEmulator: true
 
 packages:
   - examples/*
+
+allowBuilds:
+  esbuild: true
+  sharp: true
 
 catalogs:
   examples:
@@ -24,6 +30,3 @@ catalogs:
     '@fontsource/truculenta': ^5.2.7
   shared:
     typescript: ^6.0.3
-allowBuilds:
-  esbuild: true
-  sharp: true
