@@ -33,9 +33,18 @@ export function resolveUserOption(options: CustomFonts): ResolvedCustomFonts {
     prefetch,
     injectTo,
     display,
-    stripPrefix,
+    stripPrefix: normalizeDirectoryPrefix(stripPrefix),
     linkFilter,
   }
+}
+
+/**
+ * `public`, `./public` or `public\` → `public/`, so the prefix only matches whole
+ * directories of the root-relative (forward slash) font paths.
+ */
+function normalizeDirectoryPrefix(prefix: string) {
+  const normalized = prefix.replace(/\\/g, '/').replace(/^\.\//, '')
+  return normalized && !normalized.endsWith('/') ? `${normalized}/` : normalized
 }
 
 export function customVirtualModule(userOptions: CustomFonts, root: string) {
@@ -106,6 +115,9 @@ export function resolveFontFiles(family: CustomFontFamily, options: ResolvedCust
         case '.svg':
           format = 'svg'
           break
+        case '.eot':
+          format = 'embedded-opentype'
+          break
         default:
           format = ext.replace('.', '')
       }
@@ -120,9 +132,12 @@ export function resolveFontFiles(family: CustomFontFamily, options: ResolvedCust
         display: options.display,
         files: [],
       }
+      const relativePath = relative(root, file)
       face.files.push({
         src: file,
-        path: join('/', relative(root, file.replace(options.stripPrefix, ''))),
+        path: join('/', relativePath.startsWith(options.stripPrefix)
+          ? relativePath.slice(options.stripPrefix.length)
+          : relativePath),
         format,
         ext,
       })
@@ -131,6 +146,9 @@ export function resolveFontFiles(family: CustomFontFamily, options: ResolvedCust
 
   const faces: CustomFontFace[] = []
   for (const face of Object.values(facesMap)) {
+    // Browsers use the first source they support: put the smallest formats first.
+    face.files.sort((a, b) => formatRank(a.ext) - formatRank(b.ext))
+
     if (!family.transform) {
       faces.push(face)
       continue
@@ -196,25 +214,32 @@ function extractStyle(filename?: string) {
   return 'normal'
 }
 
-function generateFontCSS(face: CustomFontFace) {
-  // --- Format sources.
-  const srcs = face.files
-    .map((file) => {
-      return `url('${file.path}') format('${file.format}')`
-    })
-    .join(',\n\t\t')
+const FORMAT_PRIORITY = ['.woff2', '.woff', '.ttf', '.otf']
 
-  // --- Format local.
+function formatRank(ext: string) {
+  const rank = FORMAT_PRIORITY.indexOf(ext)
+  return rank === -1 ? FORMAT_PRIORITY.length : rank
+}
+
+function cssString(value: string) {
+  return `'${value.replace(/[\\']/g, '\\$&')}'`
+}
+
+function generateFontCSS(face: CustomFontFace) {
+  // --- Format local, listed first so an installed font is used before downloading.
   const locals = (Array.isArray(face.local) ? face.local : [face.local])
-    .filter(Boolean)
-    .map(x => `local('${x}')`)
-    .join(', ')
+    .filter((name): name is string => Boolean(name))
+    .map(name => `local(${cssString(name)})`)
+
+  // --- Format sources.
+  const urls = face.files
+    .map(file => `url(${cssString(file.path)}) format('${file.format}')`)
 
   // --- Return CSS rule as string.
   return [
     '@font-face {',
-    `  font-family: '${face.name}';`,
-    `  src: ${[srcs, locals].filter(Boolean).join(',')};`,
+    `  font-family: ${cssString(face.name)};`,
+    `  src: ${[...locals, ...urls].join(',\n\t\t')};`,
     `  font-weight: ${face.weight};`,
     `  font-style: ${face.style};`,
     `  font-display: ${face.display};`,
