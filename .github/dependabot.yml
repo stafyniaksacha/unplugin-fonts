@@ -1,0 +1,16 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # Same release-age stance as pnpm-workspace.yaml: let new releases settle
+    # before proposing them. Security updates bypass the cooldown.
+    cooldown:
+      default-days: 14
+    groups:
+      github-actions:
+        patterns:
+          - '*'
+    commit-message:
+      prefix: ci
