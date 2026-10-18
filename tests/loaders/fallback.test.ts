@@ -399,6 +399,33 @@ describe('fallback font generation', () => {
       warn.mockRestore()
     })
 
+    it('warns and skips fontsource families that resolve to no CSS import', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const { getMetricsForFamily } = await import('../../src/../tests/mocks/fontaine.js')
+
+      getMetricsForFamily.mockResolvedValueOnce(null)
+
+      const css = await generateAllFallbacks(
+        {
+          fontsource: {
+            families: [{
+              name: 'UnknownFont',
+              weights: [],
+              fallback: { category: 'sans-serif' },
+            }],
+          },
+        },
+        '/root',
+      )
+
+      expect(css).toBe('')
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('UnknownFont'),
+      )
+
+      warn.mockRestore()
+    })
+
     it('returns empty string when no fonts have fallback configured', async () => {
       const css = await generateAllFallbacks({}, '/root')
       expect(css).toBe('')

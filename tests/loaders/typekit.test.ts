@@ -11,7 +11,7 @@ describe('typekit loader', () => {
   })
 
   it('defers font loading by default', () => {
-    const [tag] = typekitLoader({ id: 'abc123' })
+    const tag = typekitLoader({ id: 'abc123' })[0]!
     expect(tag.tag).toBe('link')
     expect(tag.attrs?.rel).toBe('preload')
     expect(tag.attrs?.as).toBe('style')
@@ -20,19 +20,19 @@ describe('typekit loader', () => {
   })
 
   it('loads font immediately when deferring is disabled', () => {
-    const [tag] = typekitLoader({ id: 'abc123', defer: false })
+    const tag = typekitLoader({ id: 'abc123', defer: false })[0]!
     expect(tag.attrs?.rel).toBe('stylesheet')
     expect(tag.attrs?.onload).toBeUndefined()
     expect(tag.attrs?.as).toBeUndefined()
   })
 
   it('supports custom CDN base URL', () => {
-    const [tag] = typekitLoader({ id: 'xyz', fontBaseUrl: 'https://custom.cdn/' })
+    const tag = typekitLoader({ id: 'xyz', fontBaseUrl: 'https://custom.cdn/' })[0]!
     expect(tag.attrs?.href).toBe('https://custom.cdn/xyz.css')
   })
 
   it('allows controlling where the tag is injected', () => {
-    const [tag] = typekitLoader({ id: 'abc123', injectTo: 'body' })
+    const tag = typekitLoader({ id: 'abc123', injectTo: 'body' })[0]!
     expect(tag.injectTo).toBe('body')
   })
 })

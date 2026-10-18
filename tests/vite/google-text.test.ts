@@ -18,7 +18,7 @@ describe('google Fonts text subsetting in built HTML', () => {
         plugins: [Unfonts({ google: { families: [{ name: 'Roboto', defer }], text } })],
       })
       const html = await readFile(resolve(root, 'dist/index.html'), 'utf8')
-      const href = html.match(/href="(https:\/\/fonts.googleapis.com\/css2[^"]*)"/)![1].replaceAll('&amp;', '&')
+      const href = html.match(/href="(https:\/\/fonts.googleapis.com\/css2[^"]*)"/)![1]!.replaceAll('&amp;', '&')
       const url = new URL(href)
       expect(url.searchParams.get('text')).toBe(text)
       expect(url.searchParams.get('family')).toBe('Roboto')

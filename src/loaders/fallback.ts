@@ -41,8 +41,8 @@ const GENERIC_FAMILIES = new Set([
 interface FallbackEntry {
   familyName: string
   config: FontFallbackConfig
-  fontFilePath?: string
-  fontsourceCSS?: { specifier: string, root: string }
+  fontFilePath?: string | undefined
+  fontsourceCSS?: { specifier: string, root: string } | undefined
 }
 
 /**
@@ -79,12 +79,11 @@ function* iterateFallbackFamilies(
     for (const family of options.fontsource.families) {
       if (!family || typeof family === 'string' || !family.fallback)
         continue
+      const specifier = fontsourceImports({ families: [family] })[0]
       yield {
         familyName: family.name.replace(VARIABLE_SUFFIX_RE, ''),
         config: family.fallback,
-        fontsourceCSS: root
-          ? { specifier: fontsourceImports({ families: [family] })[0], root }
-          : undefined,
+        fontsourceCSS: root && specifier ? { specifier, root } : undefined,
       }
     }
   }
@@ -108,10 +107,9 @@ function findRepresentativeFontFile(
   root: string,
 ): string | undefined {
   const faces = resolveFontFiles(family, resolvedOptions, root)
-  if (faces.length === 0)
-    return undefined
-
   const regularFace = faces.find(f => f.weight === 400) ?? faces[0]
+  if (!regularFace)
+    return undefined
 
   const preferredOrder = ['.ttf', '.woff2', '.woff', '.otf']
   for (const ext of preferredOrder) {
@@ -164,13 +162,13 @@ async function generateFallbackForFamily(params: FallbackEntry): Promise<string>
   )
 
   const css: string[] = []
-  for (let i = 0; i < systemFonts.length; i++) {
+  for (const [i, font] of systemFonts.entries()) {
     const systemMetrics = systemMetricsList[i]
     if (!systemMetrics)
       continue
     css.push(generateFontFace(metrics, {
       name: fallbackName,
-      font: systemFonts[i],
+      font,
       metrics: systemMetrics,
     }))
   }

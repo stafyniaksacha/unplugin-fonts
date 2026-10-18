@@ -56,7 +56,7 @@ export interface CustomFontFace {
   /** Value for the `font-display` descriptor. */
   display: string
   /** Local font name(s) for `src: local()` in the `@font-face` rule. */
-  local?: string | string[]
+  local?: string | string[] | undefined
   /** Resolved font files matching the source pattern. */
   files: {
     /** Absolute path to the font file on disk. */

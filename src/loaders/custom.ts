@@ -110,7 +110,7 @@ export function resolveFontFiles(family: CustomFontFamily, options: ResolvedCust
           format = ext.replace('.', '')
       }
 
-      facesMap[basename] ||= {
+      const face = facesMap[basename] ||= {
         source,
         name: family.name,
         basename,
@@ -120,7 +120,7 @@ export function resolveFontFiles(family: CustomFontFamily, options: ResolvedCust
         display: options.display,
         files: [],
       }
-      facesMap[basename].files.push({
+      face.files.push({
         src: file,
         path: join('/', relative(root, file.replace(options.stripPrefix, ''))),
         format,

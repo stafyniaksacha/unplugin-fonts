@@ -54,7 +54,7 @@ describe('transformIndexHtml', () => {
       const preloadTags = tags.filter(t => t.tag === 'link' && t.attrs?.rel === 'preload' && t.attrs?.as === 'font')
 
       expect(preloadTags).toHaveLength(1)
-      expect(preloadTags[0].attrs?.href).toBe('/assets/MyFont-Bold-abc123.woff2')
+      expect(preloadTags[0]!.attrs?.href).toBe('/assets/MyFont-Bold-abc123.woff2')
     })
 
     it('emits no preload links when there are no custom fonts', () => {
@@ -156,7 +156,7 @@ describe('transformIndexHtml', () => {
       const styleTags = tags.filter(t => t.tag === 'style')
 
       expect(styleTags).toHaveLength(1)
-      expect(styleTags[0].children).toBe('@font-face{font-family:Roboto;src:url(/assets/roboto.woff2)}')
+      expect(styleTags[0]!.children).toBe('@font-face{font-family:Roboto;src:url(/assets/roboto.woff2)}')
     })
 
     it('strips @font-face rules from the CSS asset when inlining', () => {
@@ -191,7 +191,7 @@ describe('transformIndexHtml', () => {
       const styleTags = tags.filter(t => t.tag === 'style')
 
       expect(styleTags).toHaveLength(1)
-      expect(styleTags[0].children).toBe(
+      expect(styleTags[0]!.children).toBe(
         '@font-face{font-family:A;src:url(a.woff2)}@font-face{font-family:B;src:url(b.woff2)}',
       )
     })

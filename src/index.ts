@@ -86,8 +86,7 @@ export default createUnplugin<Options | undefined>((userOptions) => {
           return
         }
 
-        for (const chunk in bundle) {
-          const info = bundle[chunk]
+        for (const info of Object.values(bundle)) {
           if (info.name?.endsWith('.astro') || info.name === 'pages/all') {
             // @todo inject head to astro
           }

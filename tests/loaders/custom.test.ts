@@ -102,9 +102,9 @@ describe('custom fonts loader', () => {
       )
 
       expect(tags).toHaveLength(1)
-      expect(tags[0].attrs?.rel).toBe('preload')
-      expect(tags[0].attrs?.as).toBe('font')
-      expect(tags[0].attrs?.type).toBe('font/woff2')
+      expect(tags[0]!.attrs?.rel).toBe('preload')
+      expect(tags[0]!.attrs?.as).toBe('font')
+      expect(tags[0]!.attrs?.type).toBe('font/woff2')
     })
 
     it('generates prefetch link tags when prefetch is enabled', () => {
@@ -115,7 +115,7 @@ describe('custom fonts loader', () => {
         '/root',
       )
 
-      expect(tags[0].attrs?.rel).toBe('prefetch')
+      expect(tags[0]!.attrs?.rel).toBe('prefetch')
     })
 
     it('warns when both preload and prefetch are enabled together', () => {
