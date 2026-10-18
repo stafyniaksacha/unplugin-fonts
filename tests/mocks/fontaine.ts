@@ -1,6 +1,6 @@
 import { vi } from 'vitest'
 
-const robotoMetrics = {
+export const robotoMetrics = {
   ascent: 1900,
   descent: -500,
   lineGap: 0,
@@ -9,7 +9,7 @@ const robotoMetrics = {
   category: 'sans-serif',
 }
 
-const arialMetrics = {
+export const arialMetrics = {
   ascent: 1854,
   descent: -434,
   lineGap: 67,
@@ -24,18 +24,20 @@ export const generateFontFace = vi.fn((metrics, fallback) => {
   return `@font-face {\n  font-family: "${fallback.name}";\n  src: local("${fallback.font}");\n  size-adjust: 107.19%;\n  ascent-override: 86.28%;\n  descent-override: 22.71%;\n  line-gap-override: 0%;\n}\n`
 })
 
+export const timesMetrics = {
+  ascent: 1825,
+  descent: -443,
+  lineGap: 87,
+  unitsPerEm: 2048,
+  xWidthAvg: 819,
+  category: 'serif',
+}
+
 export const getMetricsForFamily = vi.fn(async (family: string) => {
   const map: Record<string, any> = {
     'Roboto': robotoMetrics,
     'Arial': arialMetrics,
-    'Times New Roman': {
-      ascent: 1825,
-      descent: -443,
-      lineGap: 87,
-      unitsPerEm: 2048,
-      xWidthAvg: 819,
-      category: 'serif',
-    },
+    'Times New Roman': timesMetrics,
   }
   return map[family] ?? null
 })

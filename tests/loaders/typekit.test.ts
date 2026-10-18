@@ -7,7 +7,6 @@ describe('typekit loader', () => {
     const result = typekitLoader({ id: undefined as any })
     expect(result).toEqual([])
     expect(warn).toHaveBeenCalledWith('A Typekit id is required')
-    warn.mockRestore()
   })
 
   it('defers font loading by default', () => {

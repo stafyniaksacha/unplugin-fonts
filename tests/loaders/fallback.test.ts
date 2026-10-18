@@ -1,21 +1,36 @@
+import type { Options } from '../../src/types.js'
+import { pathToFileURL } from 'node:url'
+import { generateFontFace, getMetricsForFamily, readMetrics, resolveCategoryFallbacks } from 'fontaine'
 import { globSync } from 'tinyglobby'
 import { describe, expect, it, vi } from 'vitest'
-import { collectFallbackNames, generateAllFallbacks, transformFontFamilyDeclarations } from '../../src/loaders/fallback.js'
+import { collectFallbackNames, generateAllFallbacks, hasFallbacks, transformFontFamilyDeclarations } from '../../src/loaders/fallback.js'
+import { arialMetrics, robotoMetrics, timesMetrics } from '../mocks/fontaine.js'
 
 vi.mock('tinyglobby', () => import('../mocks/tinyglobby.js'))
 vi.mock('fontaine', () => import('../mocks/fontaine.js'))
 
+/** CSS produced by every `generateFontFace` call so far, in call order. */
+function emittedFaces() {
+  return vi.mocked(generateFontFace).mock.results.map(result => result.value).join('')
+}
+
+const robotoOverArial = { name: 'Roboto fallback', font: 'Arial', metrics: arialMetrics }
+
 describe('fallback font generation', () => {
   describe('custom fonts', () => {
-    it('generates fallback CSS when fallback is configured', async () => {
-      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/Roboto-Regular.woff2'])
+    it('reads metrics from the regular-weight font file, preferring .ttf, when the family is unknown', async () => {
+      vi.mocked(globSync).mockReturnValue([
+        '/root/public/fonts/MyFont-Bold.woff2',
+        '/root/public/fonts/MyFont-Regular.woff2',
+        '/root/public/fonts/MyFont-Regular.ttf',
+      ])
 
       const css = await generateAllFallbacks(
         {
           custom: {
             families: [{
-              name: 'Roboto',
-              src: 'public/fonts/Roboto-Regular.*',
+              name: 'MyFont',
+              src: 'public/fonts/MyFont-*',
               fallback: { category: 'sans-serif' },
             }],
           },
@@ -23,12 +38,11 @@ describe('fallback font generation', () => {
         '/root',
       )
 
-      expect(css).toContain('@font-face')
-      expect(css).toContain('font-family:')
-      expect(css).toContain('size-adjust:')
-      expect(css).toContain('ascent-override:')
-      expect(css).toContain('descent-override:')
-      expect(css).toContain('line-gap-override:')
+      expect(vi.mocked(readMetrics)).toHaveBeenCalledTimes(1)
+      expect(String(vi.mocked(readMetrics).mock.calls[0]![0])).toBe(pathToFileURL('/root/public/fonts/MyFont-Regular.ttf').href)
+      expect(generateFontFace).toHaveBeenCalledWith(robotoMetrics, { name: 'MyFont fallback', font: 'Arial', metrics: arialMetrics })
+      expect(css).not.toBe('')
+      expect(css).toBe(emittedFaces())
     })
 
     it('skips fonts without fallback configured', async () => {
@@ -47,13 +61,11 @@ describe('fallback font generation', () => {
       )
 
       expect(css).toBe('')
+      expect(generateFontFace).not.toHaveBeenCalled()
     })
 
     it('uses custom fallback name when provided', async () => {
       vi.mocked(globSync).mockReturnValue(['/root/public/fonts/Roboto-Regular.woff2'])
-
-      const { generateFontFace } = await import('../../src/../tests/mocks/fontaine.js')
-      generateFontFace.mockClear()
 
       await generateAllFallbacks(
         {
@@ -68,18 +80,11 @@ describe('fallback font generation', () => {
         '/root',
       )
 
-      expect(generateFontFace).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ name: 'Roboto Override' }),
-      )
+      expect(generateFontFace).toHaveBeenCalledWith(robotoMetrics, { ...robotoOverArial, name: 'Roboto Override' })
     })
 
-    it('uses explicit fallback fonts when provided', async () => {
+    it('uses explicit fallback fonts instead of the category defaults', async () => {
       vi.mocked(globSync).mockReturnValue(['/root/public/fonts/Roboto-Regular.woff2'])
-
-      const { getMetricsForFamily, generateFontFace } = await import('../../src/../tests/mocks/fontaine.js')
-      generateFontFace.mockClear()
-      getMetricsForFamily.mockClear()
 
       await generateAllFallbacks(
         {
@@ -96,14 +101,58 @@ describe('fallback font generation', () => {
         '/root',
       )
 
-      // Should look up metrics for each specified fallback
-      expect(getMetricsForFamily).toHaveBeenCalledWith('Arial')
-      expect(getMetricsForFamily).toHaveBeenCalledWith('Times New Roman')
+      expect(resolveCategoryFallbacks).not.toHaveBeenCalled()
+      expect(vi.mocked(generateFontFace).mock.calls).toEqual([
+        [robotoMetrics, robotoOverArial],
+        [robotoMetrics, { name: 'Roboto fallback', font: 'Times New Roman', metrics: timesMetrics }],
+      ])
+    })
+
+    it('passes the configured category to the system fallback resolution', async () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/Roboto-Regular.woff2'])
+
+      await generateAllFallbacks(
+        {
+          custom: {
+            families: [{
+              name: 'Roboto',
+              src: 'public/fonts/Roboto-Regular.*',
+              fallback: { category: 'serif' },
+            }],
+          },
+        },
+        '/root',
+      )
+
+      expect(resolveCategoryFallbacks).toHaveBeenCalledWith({
+        fontFamily: 'Roboto',
+        fallbacks: {},
+        metrics: { ...robotoMetrics, category: 'serif' },
+      })
+    })
+
+    it('skips system fonts whose metrics are unknown', async () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/Roboto-Regular.woff2'])
+
+      await generateAllFallbacks(
+        {
+          custom: {
+            families: [{
+              name: 'Roboto',
+              src: 'public/fonts/Roboto-Regular.*',
+              fallback: { fallbacks: ['Unknown System Font', 'Arial'] },
+            }],
+          },
+        },
+        '/root',
+      )
+
+      expect(vi.mocked(generateFontFace).mock.calls).toEqual([[robotoMetrics, robotoOverArial]])
     })
   })
 
   describe('google fonts', () => {
-    it('generates fallback CSS for google fonts with fallback config', async () => {
+    it('generates fallback CSS from the family metrics', async () => {
       const css = await generateAllFallbacks(
         {
           google: {
@@ -117,12 +166,10 @@ describe('fallback font generation', () => {
         '/root',
       )
 
-      expect(css).toContain('@font-face')
-      expect(css).toContain('font-family:')
-      expect(css).toContain('size-adjust:')
-      expect(css).toContain('ascent-override:')
-      expect(css).toContain('descent-override:')
-      expect(css).toContain('line-gap-override:')
+      expect(getMetricsForFamily).toHaveBeenCalledWith('Roboto')
+      expect(generateFontFace).toHaveBeenCalledWith(robotoMetrics, robotoOverArial)
+      expect(css).not.toBe('')
+      expect(css).toBe(emittedFaces())
     })
 
     it('skips string-only google font families', async () => {
@@ -156,7 +203,7 @@ describe('fallback font generation', () => {
   })
 
   describe('fontsource fonts', () => {
-    it('generates fallback CSS for fontsource fonts with fallback config', async () => {
+    it('generates fallback CSS from the family metrics', async () => {
       const css = await generateAllFallbacks(
         {
           fontsource: {
@@ -170,18 +217,13 @@ describe('fallback font generation', () => {
         '/root',
       )
 
-      expect(css).toContain('@font-face')
-      expect(css).toContain('font-family:')
-      expect(css).toContain('size-adjust:')
-      expect(css).toContain('ascent-override:')
-      expect(css).toContain('descent-override:')
-      expect(css).toContain('line-gap-override:')
+      expect(getMetricsForFamily).toHaveBeenCalledWith('Roboto')
+      expect(generateFontFace).toHaveBeenCalledWith(robotoMetrics, robotoOverArial)
+      expect(css).not.toBe('')
+      expect(css).toBe(emittedFaces())
     })
 
     it('strips Variable suffix from fontsource family names', async () => {
-      const { getMetricsForFamily } = await import('../../src/../tests/mocks/fontaine.js')
-      getMetricsForFamily.mockClear()
-
       await generateAllFallbacks(
         {
           fontsource: {
@@ -213,7 +255,7 @@ describe('fallback font generation', () => {
   })
 
   describe('typekit fonts', () => {
-    it('generates fallback CSS for typekit fonts with fallback config', async () => {
+    it('generates fallback CSS from the family metrics', async () => {
       const css = await generateAllFallbacks(
         {
           typekit: {
@@ -227,7 +269,10 @@ describe('fallback font generation', () => {
         '/root',
       )
 
-      expect(css).toContain('@font-face')
+      expect(getMetricsForFamily).toHaveBeenCalledWith('Roboto')
+      expect(generateFontFace).toHaveBeenCalledWith(robotoMetrics, robotoOverArial)
+      expect(css).not.toBe('')
+      expect(css).toBe(emittedFaces())
     })
 
     it('skips string-only typekit families', async () => {
@@ -270,15 +315,40 @@ describe('fallback font generation', () => {
     })
   })
 
+  describe('hasFallbacks', () => {
+    it.each<[string, Options]>([
+      ['custom', { custom: { families: [{ name: 'MyFont', src: './fonts/*', fallback: {} }] } }],
+      ['google', { google: { families: [{ name: 'Roboto', fallback: {} }] } }],
+      ['fontsource', { fontsource: { families: [{ name: 'Inter', weights: [400], fallback: {} }] } }],
+      ['typekit', { typekit: { id: 'abc', families: [{ name: 'Futura PT', fallback: {} }] } }],
+    ])('is true when a %s family has a fallback', (_, options) => {
+      expect(hasFallbacks(options)).toBe(true)
+    })
+
+    it.each<[string, Options]>([
+      ['no loaders', {}],
+      ['families without fallback', { google: { families: [{ name: 'Roboto' }] }, custom: { families: [{ name: 'MyFont', src: './fonts/*' }] } }],
+      ['string-only families', { google: { families: ['Roboto'] }, fontsource: { families: ['Inter'] }, typekit: { id: 'abc', families: ['Futura PT'] } }],
+    ])('is false with %s', (_, options) => {
+      expect(hasFallbacks(options)).toBe(false)
+    })
+  })
+
   describe('font-family transform', () => {
     it('appends fallback name to font-family declarations in CSS', () => {
       const names = new Map([['Roboto', 'Roboto fallback']])
       const css = `body { font-family: 'Roboto', sans-serif; }`
       const result = transformFontFamilyDeclarations(css, 'app.css', names)
 
-      expect(result).toBeDefined()
-      expect(result!.code).toContain('"Roboto fallback"')
-      expect(result!.code).toContain(`'Roboto'`)
+      expect(result?.code).toBe(`body { font-family: 'Roboto', "Roboto fallback", sans-serif; }`)
+    })
+
+    it('appends fallback name after an unquoted single-word family', () => {
+      const names = new Map([['Roboto', 'Roboto fallback']])
+      const css = `body { font-family: Roboto, sans-serif; }`
+      const result = transformFontFamilyDeclarations(css, 'app.css', names)
+
+      expect(result?.code).toBe(`body { font-family: Roboto, "Roboto fallback", sans-serif; }`)
     })
 
     it('does not modify font-family inside @font-face rules', () => {
@@ -297,6 +367,13 @@ describe('fallback font generation', () => {
       expect(result).toBeUndefined()
     })
 
+    it('never treats generic families as font names', () => {
+      const names = new Map([['monospace', 'monospace fallback']])
+      const result = transformFontFamilyDeclarations('code { font-family: monospace; }', 'app.css', names)
+
+      expect(result).toBeUndefined()
+    })
+
     it('ignores non-CSS files', () => {
       const names = new Map([['Roboto', 'Roboto fallback']])
       const code = `const family = 'Roboto'`
@@ -310,8 +387,7 @@ describe('fallback font generation', () => {
       const css = `body { font: 16px 'Roboto', sans-serif; }`
       const result = transformFontFamilyDeclarations(css, 'app.css', names)
 
-      expect(result).toBeDefined()
-      expect(result!.code).toContain('"Roboto fallback"')
+      expect(result?.code).toBe(`body { font: 16px 'Roboto', "Roboto fallback", sans-serif; }`)
     })
 
     it('handles multiple families with fallbacks', () => {
@@ -322,9 +398,26 @@ describe('fallback font generation', () => {
       const css = `.a { font-family: 'Roboto'; } .b { font-family: 'Open Sans'; }`
       const result = transformFontFamilyDeclarations(css, 'app.css', names)
 
-      expect(result).toBeDefined()
-      expect(result!.code).toContain('"Roboto fallback"')
-      expect(result!.code).toContain('"Open Sans fallback"')
+      expect(result?.code).toBe(`.a { font-family: 'Roboto', "Roboto fallback"; } .b { font-family: 'Open Sans', "Open Sans fallback"; }`)
+    })
+
+    it('transforms style blocks of Vue single-file components', () => {
+      const names = new Map([['Roboto', 'Roboto fallback']])
+      const result = transformFontFamilyDeclarations(`.a{font-family:'Roboto'}`, '/src/App.vue?vue&type=style&index=0&lang.css', names)
+
+      expect(result?.code).toBe(`.a{font-family:'Roboto', "Roboto fallback"}`)
+    })
+
+    it('generates a sourcemap only when requested', () => {
+      const names = new Map([['Roboto', 'Roboto fallback']])
+      const css = `body { font-family: 'Roboto'; }`
+
+      expect(transformFontFamilyDeclarations(css, 'app.css', names)?.map).toBeUndefined()
+
+      const map = transformFontFamilyDeclarations(css, 'app.css', names, true)?.map
+      expect(map.sources).toEqual(['app.css'])
+      expect(map.sourcesContent).toEqual([css])
+      expect(map.mappings).not.toBe('')
     })
   })
 
@@ -371,11 +464,7 @@ describe('fallback font generation', () => {
   describe('graceful degradation', () => {
     it('warns and skips when metrics cannot be resolved', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const { getMetricsForFamily, readMetrics } = await import('../../src/../tests/mocks/fontaine.js')
-
-      getMetricsForFamily.mockResolvedValueOnce(null)
-      readMetrics.mockRejectedValueOnce(new Error('not found'))
-
+      vi.mocked(readMetrics).mockRejectedValueOnce(new Error('not found'))
       vi.mocked(globSync).mockReturnValue(['/root/public/fonts/Unknown-Regular.woff2'])
 
       const css = await generateAllFallbacks(
@@ -395,15 +484,10 @@ describe('fallback font generation', () => {
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('UnknownFont'),
       )
-
-      warn.mockRestore()
     })
 
     it('warns and skips fontsource families that resolve to no CSS import', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const { getMetricsForFamily } = await import('../../src/../tests/mocks/fontaine.js')
-
-      getMetricsForFamily.mockResolvedValueOnce(null)
 
       const css = await generateAllFallbacks(
         {
@@ -422,8 +506,6 @@ describe('fallback font generation', () => {
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('UnknownFont'),
       )
-
-      warn.mockRestore()
     })
 
     it('returns empty string when no fonts have fallback configured', async () => {

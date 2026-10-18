@@ -128,7 +128,6 @@ describe('custom fonts loader', () => {
       )
 
       expect(warn).toHaveBeenCalled()
-      warn.mockRestore()
     })
   })
 })
