@@ -89,6 +89,7 @@
     "test:vitest": "vitest run",
     "test:lint": "eslint .",
     "test:ts": "tsc",
+    "test:examples": "vitest run --config vitest.examples.config.ts",
     "release": "pnpm run test && npx standard-version && git push --follow-tags origin main && pnpm publish"
   },
   "peerDependencies": {
