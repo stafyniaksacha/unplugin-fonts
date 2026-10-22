@@ -5,7 +5,7 @@ import unplugin from './index.js'
 import { customVirtualModule } from './loaders/custom.js'
 import { generateAllFallbacks, hasFallbacks } from './loaders/fallback.js'
 import { fontsourceImports } from './loaders/fontsource.js'
-import { getHeadLinkTags } from './loaders/index.js'
+import { applyLinkFilter, getHeadLinkTags } from './loaders/index.js'
 
 export default defineNuxtModule<Options>({
   meta: {
@@ -20,10 +20,6 @@ export default defineNuxtModule<Options>({
       if (options.fontsource) {
         for (const src of fontsourceImports(options.fontsource))
           nuxt.options.css.push(src)
-      }
-
-      if (options.custom) {
-        options.custom.prefetchPrefix = nuxt.options.app.buildAssetsDir
       }
 
       nuxt.options.css.push('#build/unfonts.css')
@@ -41,7 +37,11 @@ export default defineNuxtModule<Options>({
       })
     }
 
-    const links = getHeadLinkTags(options)
+    // Public files are served from the app base URL.
+    const links = applyLinkFilter(
+      getHeadLinkTags(options, nuxt.options.rootDir, nuxt.options.app.baseURL),
+      options.custom?.linkFilter,
+    )
 
     nuxt.options.app.head ||= {}
     nuxt.options.app.head.link ||= []

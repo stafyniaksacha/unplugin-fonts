@@ -442,10 +442,38 @@ Unfonts({
      *   values: 'head' | 'body' | 'head-prepend' | 'body-prepend'
      */
     injectTo: 'head-prepend',
+
+    /**
+     * Font files whose path (relative to the project root) starts with this
+     * prefix are served as-is from the public directory, at the rest of the path.
+     * default: 'public/'
+     */
+    stripPrefix: 'public/',
+
+    /**
+     * URL prefix of the preload/prefetch links of public fonts.
+     * Defaults to Vite's `base` (Nuxt: `app.baseURL`).
+     */
+    prefetchPrefix: 'https://cdn.example.com/',
+
+    /**
+     * Filter the generated `<link>` tags: return an array to replace them,
+     * or a boolean to keep or drop them all.
+     */
+    linkFilter: tags => tags,
   },
 
 })
 ```
+
+In the generated `@font-face` rules, `local()` sources come first, then files from the smallest format to the largest (woff2, woff, ttf, otf), since browsers use the first source they support. `transform` can change this order.
+
+One preload (or prefetch) link is generated per font face, for its first file source, the one browsers download:
+
+- files in the public directory are linked by their public URL: in the HTML with Vite and VitePress, in `unplugin-fonts/head` for Astro, and in `app.head` for Nuxt;
+- other files go through the bundler and are linked by their hashed file name once the build is done (Vite and VitePress).
+
+`linkFilter` applies to all of these links, as well as to the Google Fonts and Typekit ones.
 
 ### Fontsource
 

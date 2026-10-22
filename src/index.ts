@@ -3,10 +3,10 @@ import type { CustomFonts, Options } from './types.js'
 import MagicString from 'magic-string'
 import { basename as _basename, extname } from 'pathe'
 import { createUnplugin } from 'unplugin'
-import { customVirtualModule, joinURL, resolveFontFiles, resolveUserOption } from './loaders/custom.js'
+import { customVirtualModule, isPublicFontFile, joinURL, resolveFontFiles, resolveUserOption } from './loaders/custom.js'
 import { collectFallbackNames, generateAllFallbacks, transformFontFamilyDeclarations } from './loaders/fallback.js'
 import { fontsourceImports, fontsourceVirtualModule } from './loaders/fontsource.js'
-import { getHeadLinkTags } from './loaders/index.js'
+import { applyLinkFilter, getHeadLinkTags } from './loaders/index.js'
 
 const virtualStylesId = 'unfonts.css'
 const resolvedVirtualStylesId = `\0${virtualStylesId}`
@@ -41,7 +41,7 @@ export default createUnplugin<Options | undefined>((userOptions) => {
 
     async load(id) {
       if (id.startsWith(resolvedVirtualModuleId)) {
-        const tags = getHeadLinkTags(options)
+        const tags = applyLinkFilter(getHeadLinkTags(options, root, base), options.custom?.linkFilter)
         const s = new MagicString(`export const links = ${JSON.stringify(tags)};\n`)
 
         s.append(`export const importMap = ${JSON.stringify(fontsourceImports(options.fontsource))};\n`)
@@ -107,7 +107,7 @@ export default createUnplugin<Options | undefined>((userOptions) => {
         order: 'post',
         handler: (html, ctx) => {
           const tags = [
-            ...getHeadLinkTags(options),
+            ...getHeadLinkTags(options, root, base),
             ...bundledFontLinks(options, root, base, ctx.bundle ?? {}),
           ]
           // Inline @font-face rules from bundled CSS for faster LCP
@@ -201,20 +201,6 @@ function bundledFontLinks(options: Options, root: string, base: string, bundle: 
 }
 
 /**
- * Apply the user's `linkFilter`: an array replaces the tags, a boolean keeps or drops them all.
- */
-function applyLinkFilter(tags: HtmlTagDescriptor[], linkFilter: CustomFonts['linkFilter']) {
-  if (!linkFilter)
-    return tags
-
-  const filtered = linkFilter(tags)
-  if (Array.isArray(filtered))
-    return filtered
-
-  return filtered ? tags : []
-}
-
-/**
  * Extensions of each custom font face in `@font-face` source order, keyed by basename.
  */
 function resolveCustomFontFaces(customOptions: CustomFonts | undefined, root: string): Map<string, string[]> {
@@ -223,8 +209,12 @@ function resolveCustomFontFaces(customOptions: CustomFonts | undefined, root: st
   const resolved = resolveUserOption(customOptions)
   const faces = new Map<string, string[]>()
   for (const family of resolved.families) {
-    for (const face of resolveFontFiles(family, resolved, root))
-      faces.set(face.basename, face.files.map(file => file.ext))
+    for (const face of resolveFontFiles(family, resolved, root)) {
+      // Faces whose first source is public are linked by customLoader instead.
+      const [first] = face.files
+      if (first && !isPublicFontFile(first.src, resolved, root))
+        faces.set(face.basename, face.files.map(file => file.ext))
+    }
   }
   return faces
 }
@@ -237,7 +227,7 @@ function generateVitepressBundle(
   vitepressConfig: any,
 ) {
   const tags = applyLinkFilter([
-    ...getHeadLinkTags(options),
+    ...getHeadLinkTags(options, root, base),
     ...bundledFontLinks(options, root, base, bundle ?? {}),
   ], options.custom?.linkFilter)
 

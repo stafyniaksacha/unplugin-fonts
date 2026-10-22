@@ -152,7 +152,8 @@ export interface CustomFonts {
    */
   prefetch?: boolean
   /**
-   * URL prefix prepended to font paths when using prefetch.
+   * URL prefix of the preload/prefetch links of fonts served from the public
+   * directory. Defaults to the bundler base (Vite `base`, Nuxt `app.baseURL`).
    */
   prefetchPrefix?: string
   /**

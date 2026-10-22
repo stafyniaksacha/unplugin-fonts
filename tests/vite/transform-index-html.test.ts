@@ -13,14 +13,14 @@ function createBundle(entries: Record<string, { type: string, source?: string, f
 describe('transformIndexHtml', () => {
   describe('preload scoping', () => {
     it('only preloads custom font files, not fontsource fonts', () => {
-      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      vi.mocked(globSync).mockReturnValue(['/root/src/fonts/MyFont-Bold.woff2'])
 
       const p = getVitePlugin({
         fontsource: {
           families: ['Roboto'],
         },
         custom: {
-          families: [{ name: 'MyFont', src: 'public/fonts/MyFont-Bold.*' }],
+          families: [{ name: 'MyFont', src: 'src/fonts/MyFont-Bold.*' }],
         },
       })
 
@@ -28,7 +28,7 @@ describe('transformIndexHtml', () => {
         'assets/MyFont-Bold-abc123.woff2': {
           type: 'asset',
           fileName: 'assets/MyFont-Bold-abc123.woff2',
-          originalFileNames: ['public/fonts/MyFont-Bold.woff2'],
+          originalFileNames: ['src/fonts/MyFont-Bold.woff2'],
           source: '',
         },
         'assets/roboto-latin-400-normal-xyz789.woff2': {
@@ -69,11 +69,11 @@ describe('transformIndexHtml', () => {
     })
 
     it('respects custom.preload = false', () => {
-      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      vi.mocked(globSync).mockReturnValue(['/root/src/fonts/MyFont-Bold.woff2'])
 
       const p = getVitePlugin({
         custom: {
-          families: [{ name: 'MyFont', src: 'public/fonts/MyFont-Bold.*' }],
+          families: [{ name: 'MyFont', src: 'src/fonts/MyFont-Bold.*' }],
           preload: false,
           prefetch: false,
         },
@@ -83,7 +83,7 @@ describe('transformIndexHtml', () => {
         'assets/MyFont-Bold-abc123.woff2': {
           type: 'asset',
           fileName: 'assets/MyFont-Bold-abc123.woff2',
-          originalFileNames: ['public/fonts/MyFont-Bold.woff2'],
+          originalFileNames: ['src/fonts/MyFont-Bold.woff2'],
           source: '',
         },
       })
@@ -96,13 +96,13 @@ describe('transformIndexHtml', () => {
 
     it('preloads multiple custom font files', () => {
       vi.mocked(globSync).mockReturnValue([
-        '/root/public/fonts/MyFont-Regular.woff2',
-        '/root/public/fonts/MyFont-Bold.woff2',
+        '/root/src/fonts/MyFont-Regular.woff2',
+        '/root/src/fonts/MyFont-Bold.woff2',
       ])
 
       const p = getVitePlugin({
         custom: {
-          families: [{ name: 'MyFont', src: 'public/fonts/MyFont-*' }],
+          families: [{ name: 'MyFont', src: 'src/fonts/MyFont-*' }],
         },
       })
 
@@ -110,13 +110,13 @@ describe('transformIndexHtml', () => {
         'assets/MyFont-Regular-aaa111.woff2': {
           type: 'asset',
           fileName: 'assets/MyFont-Regular-aaa111.woff2',
-          originalFileNames: ['public/fonts/MyFont-Regular.woff2'],
+          originalFileNames: ['src/fonts/MyFont-Regular.woff2'],
           source: '',
         },
         'assets/MyFont-Bold-bbb222.woff2': {
           type: 'asset',
           fileName: 'assets/MyFont-Bold-bbb222.woff2',
-          originalFileNames: ['public/fonts/MyFont-Bold.woff2'],
+          originalFileNames: ['src/fonts/MyFont-Bold.woff2'],
           source: '',
         },
       })
@@ -279,14 +279,14 @@ describe('transformIndexHtml', () => {
       'assets/MyFont-Bold-abc123.woff2': {
         type: 'asset',
         fileName: 'assets/MyFont-Bold-abc123.woff2',
-        originalFileNames: ['public/fonts/MyFont-Bold.woff2'],
+        originalFileNames: ['src/fonts/MyFont-Bold.woff2'],
         source: '',
       },
     })
-    const myFont = { name: 'MyFont', src: 'public/fonts/MyFont-Bold.*' }
+    const myFont = { name: 'MyFont', src: 'src/fonts/MyFont-Bold.*' }
 
     it('emits google/typekit links followed by font preloads', () => {
-      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      vi.mocked(globSync).mockReturnValue(['/root/src/fonts/MyFont-Bold.woff2'])
       const p = getVitePlugin({ google: { families: ['Roboto'], preconnect: false }, custom: { families: [myFont] } })
 
       expect(callTransformIndexHtml(p, fontBundle())).toEqual([
@@ -306,28 +306,28 @@ describe('transformIndexHtml', () => {
     })
 
     it('only emits head links in dev, where there is no bundle', () => {
-      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      vi.mocked(globSync).mockReturnValue(['/root/src/fonts/MyFont-Bold.woff2'])
       const p = getVitePlugin({ typekit: { id: 'abc' }, custom: { families: [myFont] } })
 
       expect(callTransformIndexHtml(p, undefined).map(t => t.attrs?.href)).toEqual(['https://use.typekit.net/abc.css'])
     })
 
     it('uses rel=prefetch when prefetch is enabled', () => {
-      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      vi.mocked(globSync).mockReturnValue(['/root/src/fonts/MyFont-Bold.woff2'])
       const p = getVitePlugin({ custom: { families: [myFont], prefetch: true } })
 
       expect(callTransformIndexHtml(p, fontBundle()).map(t => t.attrs?.rel)).toEqual(['prefetch'])
     })
 
     it('injects font links where requested', () => {
-      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      vi.mocked(globSync).mockReturnValue(['/root/src/fonts/MyFont-Bold.woff2'])
       const p = getVitePlugin({ custom: { families: [myFont], injectTo: 'body' } })
 
       expect(callTransformIndexHtml(p, fontBundle()).map(t => t.injectTo)).toEqual(['body'])
     })
 
     it('prefixes font links with the configured base', () => {
-      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      vi.mocked(globSync).mockReturnValue(['/root/src/fonts/MyFont-Bold.woff2'])
       const p = getVitePlugin({ custom: { families: [myFont] } }, { base: '/sub/' })
 
       expect(callTransformIndexHtml(p, fontBundle()).map(t => t.attrs?.href)).toEqual(['/sub/assets/MyFont-Bold-abc123.woff2'])
@@ -339,7 +339,7 @@ describe('transformIndexHtml', () => {
       ['preload: false', { preload: false }, []],
       ['preload: false, prefetch: true', { preload: false, prefetch: true }, ['prefetch']],
     ])('resolves preload/prefetch defaults with %s', (_, flags, rels) => {
-      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      vi.mocked(globSync).mockReturnValue(['/root/src/fonts/MyFont-Bold.woff2'])
       const p = getVitePlugin({ custom: { families: [myFont], ...flags } })
 
       expect(callTransformIndexHtml(p, fontBundle()).map(t => t.attrs?.rel)).toEqual(rels)
@@ -351,7 +351,7 @@ describe('transformIndexHtml', () => {
       ['/sub', '/sub/assets/MyFont-Bold-abc123.woff2'],
       ['./', './assets/MyFont-Bold-abc123.woff2'],
     ])('keeps base %s intact in font links', (base, href) => {
-      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      vi.mocked(globSync).mockReturnValue(['/root/src/fonts/MyFont-Bold.woff2'])
       const p = getVitePlugin({ custom: { families: [myFont] } }, { base })
 
       expect(callTransformIndexHtml(p, fontBundle()).map(t => t.attrs?.href)).toEqual([href])
@@ -376,7 +376,7 @@ describe('transformIndexHtml', () => {
     })
 
     it('matches assets by name when the bundler has no originalFileNames (Vite 4 / Rollup 3)', () => {
-      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      vi.mocked(globSync).mockReturnValue(['/root/src/fonts/MyFont-Bold.woff2'])
       const p = getVitePlugin({ custom: { families: [myFont] } })
 
       const tags = callTransformIndexHtml(p, createBundle({
@@ -391,10 +391,80 @@ describe('transformIndexHtml', () => {
       ['true', () => true, ['https://use.typekit.net/abc.css', '/assets/MyFont-Bold-abc123.woff2']],
       ['false', () => false, []],
     ])('applies linkFilter returning %s to every link', (_, linkFilter, hrefs) => {
-      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      vi.mocked(globSync).mockReturnValue(['/root/src/fonts/MyFont-Bold.woff2'])
       const p = getVitePlugin({ typekit: { id: 'abc' }, custom: { families: [myFont], linkFilter } })
 
       expect(callTransformIndexHtml(p, fontBundle()).map(t => t.attrs?.href)).toEqual(hrefs)
+    })
+  })
+
+  describe('public fonts', () => {
+    const publicFont = { name: 'MyFont', src: 'public/fonts/MyFont-Bold.*' }
+
+    it('preloads custom fonts served from the public directory', () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      const p = getVitePlugin({ custom: { families: [publicFont] } })
+
+      expect(callTransformIndexHtml(p, {})).toEqual([{
+        tag: 'link',
+        injectTo: 'head-prepend',
+        attrs: { rel: 'preload', as: 'font', type: 'font/woff2', href: '/fonts/MyFont-Bold.woff2', crossorigin: 'anonymous' },
+      }])
+    })
+
+    it('preloads public fonts in dev too', () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      const p = getVitePlugin({ custom: { families: [publicFont] } })
+
+      expect(callTransformIndexHtml(p, undefined).map(t => t.attrs?.href)).toEqual(['/fonts/MyFont-Bold.woff2'])
+    })
+
+    it.each([
+      [{ base: '/sub/' }, {}, '/sub/fonts/MyFont-Bold.woff2'],
+      [{ base: '/sub/' }, { prefetchPrefix: 'https://cdn.example.com' }, 'https://cdn.example.com/fonts/MyFont-Bold.woff2'],
+    ])('prefixes public font links with the base or prefetchPrefix (%o, %o)', (config, extra, href) => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      const p = getVitePlugin({ custom: { families: [publicFont], ...extra } }, config)
+
+      expect(callTransformIndexHtml(p, {}).map(t => t.attrs?.href)).toEqual([href])
+    })
+
+    it('links public and bundled fonts once each', () => {
+      vi.mocked(globSync).mockImplementation(source => String(source).startsWith('public/')
+        ? ['/root/public/fonts/A-Regular.woff2']
+        : ['/root/src/fonts/B-Regular.woff2'])
+      const p = getVitePlugin({
+        custom: { families: [{ name: 'A', src: 'public/fonts/A-*' }, { name: 'B', src: 'src/fonts/B-*' }] },
+      })
+
+      const tags = callTransformIndexHtml(p, createBundle({
+        'assets/B-Regular-abc.woff2': { type: 'asset', fileName: 'assets/B-Regular-abc.woff2', originalFileNames: ['src/fonts/B-Regular.woff2'] },
+        // public files are never bundled by Vite; make sure one would not be linked twice
+        'assets/A-Regular-def.woff2': { type: 'asset', fileName: 'assets/A-Regular-def.woff2', originalFileNames: ['public/fonts/A-Regular.woff2'] },
+      }))
+
+      expect(tags.map(t => t.attrs?.href)).toEqual(['/fonts/A-Regular.woff2', '/assets/B-Regular-abc.woff2'])
+    })
+
+    it('warns about preload + prefetch once for a multi-page build', () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const p = getVitePlugin({ custom: { families: [publicFont], preload: true, prefetch: true } })
+
+      for (const page of ['index.html', 'about.html', 'contact.html'])
+        expect(callTransformIndexHtml(p, {}), page).toHaveLength(1)
+
+      expect(warn).toHaveBeenCalledTimes(1)
+    })
+
+    it.each([
+      ['preload: false', { preload: false }],
+      ['a linkFilter dropping every link', { linkFilter: () => false }],
+    ])('emits nothing with %s', (_, extra) => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      const p = getVitePlugin({ custom: { families: [publicFont], ...extra } })
+
+      expect(callTransformIndexHtml(p, {})).toEqual([])
     })
   })
 
@@ -413,19 +483,19 @@ describe('transformIndexHtml', () => {
     })
 
     it('adds head entries to the VitePress site config instead of the HTML', () => {
-      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      vi.mocked(globSync).mockReturnValue(['/root/src/fonts/MyFont-Bold.woff2'])
       const head: unknown[] = []
       vi.stubGlobal('VITEPRESS_CONFIG', { site: { head } })
       const p = getVitePlugin({
         google: { families: ['Roboto'], preconnect: false },
-        custom: { families: [{ name: 'MyFont', src: 'public/fonts/MyFont-Bold.*' }] },
+        custom: { families: [{ name: 'MyFont', src: 'src/fonts/MyFont-Bold.*' }] },
       })
 
       p.vite.generateBundle({}, createBundle({
         'assets/MyFont-Bold-abc123.woff2': {
           type: 'asset',
           fileName: 'assets/MyFont-Bold-abc123.woff2',
-          originalFileNames: ['public/fonts/MyFont-Bold.woff2'],
+          originalFileNames: ['src/fonts/MyFont-Bold.woff2'],
         },
       }))
 
