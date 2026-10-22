@@ -312,6 +312,22 @@ describe('transformIndexHtml', () => {
       expect(callTransformIndexHtml(p, undefined).map(t => t.attrs?.href)).toEqual(['https://use.typekit.net/abc.css'])
     })
 
+    it('lets linkFilter add attributes to the links (#7)', () => {
+      vi.mocked(globSync).mockReturnValue(['/root/src/fonts/MyFont-Bold.woff2'])
+      const p = getVitePlugin({
+        custom: {
+          families: [myFont],
+          linkFilter: tags => tags.map(tag => ({ ...tag, attrs: { ...tag.attrs, fetchpriority: 'high' } })),
+        },
+      })
+
+      expect(callTransformIndexHtml(p, fontBundle())).toEqual([
+        expect.objectContaining({
+          attrs: expect.objectContaining({ href: '/assets/MyFont-Bold-abc123.woff2', fetchpriority: 'high' }),
+        }),
+      ])
+    })
+
     it('uses rel=prefetch when prefetch is enabled', () => {
       vi.mocked(globSync).mockReturnValue(['/root/src/fonts/MyFont-Bold.woff2'])
       const p = getVitePlugin({ custom: { families: [myFont], prefetch: true } })

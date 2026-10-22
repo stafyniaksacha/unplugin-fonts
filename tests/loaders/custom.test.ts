@@ -1,4 +1,5 @@
 import type { CssNode } from 'css-tree'
+import type { CustomFonts } from '../../src/types.js'
 import { parse, walk } from 'css-tree'
 import { globSync } from 'tinyglobby'
 import { describe, expect, it, vi } from 'vitest'
@@ -127,6 +128,23 @@ describe('custom fonts loader', () => {
       )
 
       expect(css).toContain(`  src: local('Roboto'),\n\t\tlocal('Roboto-Regular'),\n\t\turl('/fonts/Roboto-Regular.woff2') format('woff2');`)
+    })
+
+    it('keeps the file order set by transform (#66)', () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/A-Regular.ttf', '/root/public/fonts/A-Regular.woff2'])
+
+      const css = customVirtualModule({
+        families: [{
+          name: 'A',
+          src: 'public/fonts/*',
+          transform(face) {
+            face.files.reverse()
+            return face
+          },
+        }],
+      }, '/root')
+
+      expect(css.match(/format\('[\w-]+'\)/g)).toEqual(['format(\'truetype\')', 'format(\'woff2\')'])
     })
 
     it('uses the registered format name for .eot files', () => {
@@ -291,6 +309,24 @@ describe('custom fonts loader', () => {
       }, '/root')
 
       expect(tags.map(tag => tag.attrs?.href)).toEqual(['/fonts/Roboto-Bold.woff'])
+    })
+
+    it('uses the path set by transform in url() and in the preload link (#29)', () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/A-Regular.woff2'])
+      const custom: CustomFonts = {
+        families: [{
+          name: 'A',
+          src: 'public/fonts/*',
+          transform(face) {
+            for (const file of face.files)
+              file.path = `/cdn${file.path}`
+            return face
+          },
+        }],
+      }
+
+      expect(customVirtualModule(custom, '/root')).toContain('url(\'/cdn/fonts/A-Regular.woff2\')')
+      expect(customLoader(custom, '/root').map(tag => tag.attrs?.href)).toEqual(['/cdn/fonts/A-Regular.woff2'])
     })
 
     it('leaves fonts outside the public directory to the bundler', () => {
