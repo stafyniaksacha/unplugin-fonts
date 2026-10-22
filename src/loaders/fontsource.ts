@@ -37,8 +37,18 @@ export function fontsourceImports(options?: FontsourceFonts) {
         continue
       }
 
-      const activeAxes = Object.keys(family.variable).filter(axis => axis !== 'ital')
+      const activeAxes = Object.entries(family.variable)
+        .filter(([axis, enabled]) => enabled && axis !== 'ital')
+        .map(([axis]) => axis)
       const isItal = family.variable.ital
+
+      // No axis enabled: use the default weight axis, like `variable: true`.
+      // (standard.css only exists for fonts with several standard axes.)
+      if (activeAxes.length === 0) {
+        source.push(`@fontsource-variable/${name}/${isItal ? 'wght-italic' : 'index'}.css`)
+        continue
+      }
+
       const isStandard = activeAxes.every(axis =>
         ['wght', 'wdth', 'slnt', 'opsz'].includes(axis),
       )
