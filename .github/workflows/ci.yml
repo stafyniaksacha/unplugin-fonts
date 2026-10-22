@@ -31,3 +31,4 @@ jobs:
       - run: pnpm run test:vitest
       - run: pnpm run build
       - run: pnpm --filter "./examples/*" run build
+      - run: pnpm run test:examples
