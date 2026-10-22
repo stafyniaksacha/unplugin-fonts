@@ -1,24 +1,12 @@
-import type { HtmlTagDescriptor } from 'vite'
 import { globSync } from 'tinyglobby'
 import { describe, expect, it, vi } from 'vitest'
-import plugin from '../../src/index.js'
+import { callTransformIndexHtml, getVitePlugin } from '../helpers/vite.js'
 
 vi.mock('tinyglobby', () => import('../mocks/tinyglobby.js'))
 vi.mock('fontaine', () => import('../mocks/fontaine.js'))
 
 function createBundle(entries: Record<string, { type: string, source?: string, fileName: string, originalFileNames?: string[], name?: string }>) {
   return entries
-}
-
-function getVitePlugin(options: Parameters<typeof plugin.raw>[0]) {
-  const p = plugin.raw(options, { framework: 'vite', versions: {} }) as any
-  // simulate configResolved
-  p.vite.configResolved({ root: '/root', base: '/' })
-  return p
-}
-
-function callTransformIndexHtml(p: any, bundle: any) {
-  return p.vite.transformIndexHtml.handler('', { bundle }) as HtmlTagDescriptor[]
 }
 
 describe('transformIndexHtml', () => {
