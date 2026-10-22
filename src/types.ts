@@ -88,9 +88,9 @@ export interface CustomFontFamily {
    * ```css
    * font-face {
    *    font-family: 'Roboto';
-   *    src: url(./RobotoBoldItalic.ttf) format('truetype')
-   *         url(./RobotoBoldItalic.woff) format('woff')
-   *         url(./RobotoBoldItalic.woff2) format('woff2');
+   *    src: url(./RobotoBoldItalic.woff2) format('woff2'),
+   *         url(./RobotoBoldItalic.woff) format('woff'),
+   *         url(./RobotoBoldItalic.ttf) format('truetype');
    *    font-weight: bold;
    *    font-style: italic;
    *    font-display: auto;
@@ -168,7 +168,9 @@ export interface CustomFonts {
   injectTo?: 'head' | 'body' | 'head-prepend' | 'body-prepend'
 
   /**
-   * Remove the prefix from the front path
+   * Directory, relative to the project root, removed from the front of font paths
+   * to build their URL (`public/fonts/a.woff2` → `/fonts/a.woff2`).
+   * `public`, `./public` and `public/` are equivalent.
    * @default: 'public/'
    */
   stripPrefix?: string
