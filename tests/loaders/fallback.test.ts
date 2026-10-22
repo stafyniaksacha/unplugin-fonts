@@ -408,6 +408,87 @@ describe('fallback font generation', () => {
       expect(result?.code).toBe(`.a{font-family:'Roboto', "Roboto fallback"}`)
     })
 
+    it.each([
+      ['plain nesting', `.a { .b { font-family: 'Roboto'; } }`, `.a { .b { font-family: 'Roboto', "Roboto fallback"; } }`],
+      ['& nesting', `.a { & .b { font-family: 'Roboto'; } }`, `.a { & .b { font-family: 'Roboto', "Roboto fallback"; } }`],
+      ['three levels', `.a { .b { .c { font-family: Roboto } } }`, `.a { .b { .c { font-family: Roboto, "Roboto fallback" } } }`],
+      ['nesting inside @media', `@media (min-width: 1px) { .a { .b { font: 16px 'Roboto' } } }`, `@media (min-width: 1px) { .a { .b { font: 16px 'Roboto', "Roboto fallback" } } }`],
+    ])('handles %s', (_, css, expected) => {
+      const names = new Map([['Roboto', 'Roboto fallback']])
+
+      expect(transformFontFamilyDeclarations(css, 'app.css', names)?.code).toBe(expected)
+    })
+
+    it('handles nested rules in SCSS sources', () => {
+      const names = new Map([['Roboto', 'Roboto fallback']])
+      const scss = `$size: 16px;\n.a {\n  // comment\n  &:hover { font-family: 'Roboto'; }\n  .b { font: 16px 'Roboto'; }\n}`
+      const result = transformFontFamilyDeclarations(scss, 'app.scss', names)
+
+      expect(result?.code).toBe(`$size: 16px;\n.a {\n  // comment\n  &:hover { font-family: 'Roboto', "Roboto fallback"; }\n  .b { font: 16px 'Roboto', "Roboto fallback"; }\n}`)
+    })
+
+    it('leaves values using preprocessor variables untouched', () => {
+      // Known limitation: the transform runs before the preprocessor, and css-tree
+      // cannot parse `$size`, so the whole value is kept as raw text.
+      const names = new Map([['Roboto', 'Roboto fallback']])
+
+      expect(transformFontFamilyDeclarations(`.a { font: $size 'Roboto'; }`, 'app.scss', names)).toBeUndefined()
+    })
+
+    it('leaves custom property values alone', () => {
+      const names = new Map([['Roboto', 'Roboto fallback']])
+
+      expect(transformFontFamilyDeclarations(`:root { --font: 'Roboto'; }`, 'app.css', names)).toBeUndefined()
+    })
+
+    it('matches unquoted multi-word family names', () => {
+      const names = new Map([['Open Sans', 'Open Sans fallback']])
+
+      expect(transformFontFamilyDeclarations(`body { font-family: Open Sans, sans-serif; }`, 'app.css', names)?.code)
+        .toBe(`body { font-family: Open Sans, "Open Sans fallback", sans-serif; }`)
+      expect(transformFontFamilyDeclarations(`body { font: italic 16px/1.5 Open Sans, sans-serif; }`, 'app.css', names)?.code)
+        .toBe(`body { font: italic 16px/1.5 Open Sans, "Open Sans fallback", sans-serif; }`)
+    })
+
+    it.each([
+      ['a line-height keyword', `body { font: 16px/normal Roboto, sans-serif; }`, `body { font: 16px/normal Roboto, "Roboto fallback", sans-serif; }`],
+      ['a size keyword', `body { font: medium Roboto; }`, `body { font: medium Roboto, "Roboto fallback"; }`],
+      ['weight and size keywords', `body { font: bold medium Open Sans; }`, `body { font: bold medium Open Sans, "Open Sans fallback"; }`],
+    ])('separates %s from the first family of the font shorthand', (_, css, expected) => {
+      const names = new Map([['Roboto', 'Roboto fallback'], ['Open Sans', 'Open Sans fallback']])
+
+      expect(transformFontFamilyDeclarations(css, 'app.css', names)?.code).toBe(expected)
+    })
+
+    it('does not match the end of an unquoted family name in font-family', () => {
+      const names = new Map([['Roboto', 'Roboto fallback']])
+
+      expect(transformFontFamilyDeclarations(`body { font-family: Foo Roboto, sans-serif; }`, 'app.css', names)).toBeUndefined()
+    })
+
+    it('matches family names case-insensitively', () => {
+      const names = new Map([['Open Sans', 'Open Sans fallback']])
+
+      expect(transformFontFamilyDeclarations(`body { font-family: 'open sans'; }`, 'app.css', names)?.code)
+        .toBe(`body { font-family: 'open sans', "Open Sans fallback"; }`)
+    })
+
+    it('does not append a fallback that is already listed', () => {
+      const names = new Map([['Roboto', 'Roboto fallback']])
+
+      expect(transformFontFamilyDeclarations(`body { font-family: 'Roboto', "Roboto fallback", sans-serif; }`, 'app.css', names))
+        .toBeUndefined()
+    })
+
+    it('matches the "… Variable" family declared by fontsource variable packages', () => {
+      const names = collectFallbackNames({
+        fontsource: { families: [{ name: 'Roboto Variable', variable: true, fallback: {} }] },
+      })
+
+      expect(transformFontFamilyDeclarations(`body { font-family: 'Roboto Variable', sans-serif; }`, 'app.css', names)?.code)
+        .toBe(`body { font-family: 'Roboto Variable', "Roboto fallback", sans-serif; }`)
+    })
+
     it('generates a sourcemap only when requested', () => {
       const names = new Map([['Roboto', 'Roboto fallback']])
       const css = `body { font-family: 'Roboto'; }`
@@ -443,6 +524,18 @@ describe('fallback font generation', () => {
       expect(names.get('Roboto')).toBe('Roboto Override')
       expect(names.get('Inter')).toBe('Inter fallback')
       expect(names.get('Futura PT')).toBe('Futura PT fallback')
+    })
+
+    it.each([
+      ['named "… Variable"', { name: 'Roboto Variable', variable: true as const, fallback: {} }],
+      ['with variable axes', { name: 'Roboto', variable: { wght: true }, fallback: {} }],
+    ])('maps both names of a fontsource variable family %s', (_, family) => {
+      const names = collectFallbackNames({ fontsource: { families: [family] } })
+
+      expect(Object.fromEntries(names)).toEqual({
+        'Roboto': 'Roboto fallback',
+        'Roboto Variable': 'Roboto fallback',
+      })
     })
 
     it('skips families without fallback', () => {
@@ -505,6 +598,28 @@ describe('fallback font generation', () => {
       expect(css).toBe('')
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('UnknownFont'),
+      )
+    })
+
+    it('warns and skips fontsource families whose package is not installed', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const css = await generateAllFallbacks(
+        {
+          fontsource: {
+            families: [{
+              name: 'Definitely Not Installed',
+              weights: [400],
+              fallback: { category: 'sans-serif' },
+            }],
+          },
+        },
+        process.cwd(),
+      )
+
+      expect(css).toBe('')
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('Definitely Not Installed'),
       )
     })
 

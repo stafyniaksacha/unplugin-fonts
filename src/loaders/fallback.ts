@@ -1,3 +1,4 @@
+import type { CssNode, Identifier, Value, WalkContext } from 'css-tree'
 import type { CustomFontFamily, FontFallbackConfig, Options } from '../types.js'
 import type { ResolvedCustomFonts } from './custom.js'
 import { readFile } from 'node:fs/promises'
@@ -40,6 +41,8 @@ const GENERIC_FAMILIES = new Set([
 
 interface FallbackEntry {
   familyName: string
+  /** Other names the font is declared under in CSS. */
+  aliases?: string[]
   config: FontFallbackConfig
   fontFilePath?: string | undefined
   fontsourceCSS?: { specifier: string, root: string } | undefined
@@ -80,8 +83,11 @@ function* iterateFallbackFamilies(
       if (!family || typeof family === 'string' || !family.fallback)
         continue
       const specifier = fontsourceImports({ families: [family] })[0]
+      const familyName = family.name.replace(VARIABLE_SUFFIX_RE, '')
       yield {
-        familyName: family.name.replace(VARIABLE_SUFFIX_RE, ''),
+        familyName,
+        // Variable packages declare their @font-face as "<name> Variable".
+        aliases: specifier?.startsWith('@fontsource-variable/') ? [`${familyName} Variable`] : [],
         config: family.fallback,
         fontsourceCSS: root && specifier ? { specifier, root } : undefined,
       }
@@ -121,18 +127,26 @@ function findRepresentativeFontFile(
   return regularFace.files[0]?.src
 }
 
+/**
+ * Read metrics from the first font file referenced by an installed Fontsource stylesheet.
+ * Rejects when the package is not installed.
+ */
+async function readFontsourceMetrics({ specifier, root }: { specifier: string, root: string }) {
+  const require = createRequire(resolve(root, 'package.json'))
+  const cssPath = require.resolve(specifier)
+  const css = await readFile(cssPath, 'utf8')
+  const source = find(parse(css), node => node.type === 'Url')
+  return source?.type === 'Url'
+    ? readMetrics(new URL(source.value, pathToFileURL(cssPath)))
+    : null
+}
+
 async function generateFallbackForFamily(params: FallbackEntry): Promise<string> {
   const { familyName, config, fontFilePath, fontsourceCSS } = params
 
   let metrics = await getMetricsForFamily(familyName)
   if (!metrics && fontsourceCSS) {
-    const require = createRequire(resolve(fontsourceCSS.root, 'package.json'))
-    const cssPath = require.resolve(fontsourceCSS.specifier)
-    const css = await readFile(cssPath, 'utf8')
-    const source = find(parse(css), node => node.type === 'Url')
-    if (source?.type === 'Url') {
-      metrics = await readMetrics(new URL(source.value, pathToFileURL(cssPath)))
-    }
+    metrics = await readFontsourceMetrics(fontsourceCSS).catch(() => null)
   }
   if (!metrics && fontFilePath) {
     metrics = await readMetrics(pathToFileURL(fontFilePath)).catch(() => null)
@@ -208,8 +222,10 @@ export function collectFallbackNames(options: Options): Map<string, string> {
   const resolvedCustom = options.custom ? resolveUserOption(options.custom) : undefined
   const map = new Map<string, string>()
 
-  for (const { familyName, config } of iterateFallbackFamilies(options, resolvedCustom)) {
-    map.set(familyName, config.name ?? generateFallbackName(familyName))
+  for (const { familyName, aliases = [], config } of iterateFallbackFamilies(options, resolvedCustom)) {
+    const fallbackName = config.name ?? generateFallbackName(familyName)
+    for (const name of [familyName, ...aliases])
+      map.set(name, fallbackName)
   }
 
   return map
@@ -230,40 +246,10 @@ export function transformFontFamilyDeclarations(
   if (fallbackNames.size === 0)
     return undefined
 
+  // Family names are ASCII case-insensitive in CSS.
+  const lookup = new Map([...fallbackNames].map(([family, fallback]) => [family.toLowerCase(), fallback]))
   const s = new MagicString(code)
-  const ast = parse(code, { positions: true })
-
-  walk(ast, {
-    visit: 'Declaration',
-    enter(node) {
-      if (node.property !== 'font-family' && node.property !== 'font')
-        return
-      if (this.atrule && this.atrule.name === 'font-face')
-        return
-      if (node.value.type !== 'Value')
-        return
-
-      for (const child of node.value.children) {
-        let family: string | undefined
-
-        if (child.type === 'String') {
-          family = child.value
-        }
-        else if (child.type === 'Identifier' && !GENERIC_FAMILIES.has(child.name)) {
-          family = child.name
-        }
-
-        if (!family)
-          continue
-
-        const fallbackName = fallbackNames.get(family)
-        if (!fallbackName)
-          continue
-
-        s.appendRight(child.loc!.end.offset, `, "${fallbackName}"`)
-      }
-    },
-  })
+  appendFallbacks(s, code, 0, lookup)
 
   if (!s.hasChanged())
     return undefined
@@ -274,4 +260,98 @@ export function transformFontFamilyDeclarations(
       ? s.generateMap({ source: id, includeContent: true })
       : undefined,
   }
+}
+
+/**
+ * Parse `css`, found at `offset` in the original source, and append fallback names
+ * to its font declarations. css-tree keeps nested rules without `&` (`.a { .b {} }`)
+ * as raw block content, so those are parsed recursively.
+ */
+function appendFallbacks(s: MagicString, css: string, offset: number, lookup: Map<string, string>) {
+  walk(parse(css, { positions: true, offset }), {
+    enter(this: WalkContext, node: CssNode) {
+      if (this.atrule?.name === 'font-face')
+        return
+
+      if (node.type === 'Raw' && this.block && !this.declaration && node.value.includes('{')) {
+        appendFallbacks(s, node.value, node.loc!.start.offset, lookup)
+        return
+      }
+
+      if (node.type !== 'Declaration' || (node.property !== 'font-family' && node.property !== 'font'))
+        return
+      if (node.value.type !== 'Value')
+        return
+
+      const families = familyNames(node.value)
+      const listed = new Set(families.map(family => family.name.toLowerCase()))
+
+      for (const family of families) {
+        const fallbackName = findFallback(family, lookup, node.property === 'font')
+        if (!fallbackName || listed.has(fallbackName.toLowerCase()))
+          continue
+
+        listed.add(fallbackName.toLowerCase())
+        s.appendRight(family.end, `, "${fallbackName}"`)
+      }
+    },
+  })
+}
+
+/**
+ * The fallback name for a candidate family. In the `font` shorthand, keywords such
+ * as `normal` or `medium` can precede the first family in the same identifier run,
+ * so the words of an unquoted name are also tried from the end
+ * (`medium Open Sans` → `Open Sans`).
+ */
+function findFallback(family: FamilyName, lookup: Map<string, string>, shorthand: boolean) {
+  const words = family.quoted ? [family.name] : family.name.split(' ')
+  const starts = shorthand && !family.quoted ? [...words.keys()] : [0]
+
+  for (const start of starts) {
+    const name = words.slice(start).join(' ').toLowerCase()
+    if (!family.quoted && GENERIC_FAMILIES.has(name))
+      return undefined
+    const fallbackName = lookup.get(name)
+    if (fallbackName)
+      return fallbackName
+  }
+
+  return undefined
+}
+
+interface FamilyName {
+  name: string
+  quoted: boolean
+  /** Offset where the name ends in the source. */
+  end: number
+}
+
+/**
+ * Candidate family names in a `font` / `font-family` value: quoted strings, and
+ * runs of identifiers such as `Open Sans`, with the offset where each one ends.
+ */
+function familyNames(value: Value) {
+  const families: FamilyName[] = []
+  let run: Identifier[] = []
+
+  const flush = () => {
+    const last = run.at(-1)
+    if (last)
+      families.push({ name: run.map(node => node.name).join(' '), quoted: false, end: last.loc!.end.offset })
+    run = []
+  }
+
+  for (const child of value.children) {
+    if (child.type === 'Identifier') {
+      run.push(child)
+      continue
+    }
+    flush()
+    if (child.type === 'String')
+      families.push({ name: child.value, quoted: true, end: child.loc!.end.offset })
+  }
+  flush()
+
+  return families
 }
