@@ -254,4 +254,101 @@ describe('transformIndexHtml', () => {
       expect(styleTags).toHaveLength(0)
     })
   })
+
+  describe('links', () => {
+    const fontBundle = () => createBundle({
+      'assets/MyFont-Bold-abc123.woff2': {
+        type: 'asset',
+        fileName: 'assets/MyFont-Bold-abc123.woff2',
+        originalFileNames: ['public/fonts/MyFont-Bold.woff2'],
+        source: '',
+      },
+    })
+    const myFont = { name: 'MyFont', src: 'public/fonts/MyFont-Bold.*' }
+
+    it('emits google/typekit links followed by font preloads', () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      const p = getVitePlugin({ google: { families: ['Roboto'], preconnect: false }, custom: { families: [myFont] } })
+
+      expect(callTransformIndexHtml(p, fontBundle())).toEqual([
+        expect.objectContaining({ attrs: expect.objectContaining({ as: 'style' }) }),
+        {
+          tag: 'link',
+          injectTo: 'head-prepend',
+          attrs: {
+            rel: 'preload',
+            as: 'font',
+            type: 'font/woff2',
+            href: '/assets/MyFont-Bold-abc123.woff2',
+            crossorigin: 'anonymous',
+          },
+        },
+      ])
+    })
+
+    it('only emits head links in dev, where there is no bundle', () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      const p = getVitePlugin({ typekit: { id: 'abc' }, custom: { families: [myFont] } })
+
+      expect(callTransformIndexHtml(p, undefined).map(t => t.attrs?.href)).toEqual(['https://use.typekit.net/abc.css'])
+    })
+
+    it('uses rel=prefetch when prefetch is enabled', () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      const p = getVitePlugin({ custom: { families: [myFont], prefetch: true } })
+
+      expect(callTransformIndexHtml(p, fontBundle()).map(t => t.attrs?.rel)).toEqual(['prefetch'])
+    })
+
+    it('injects font links where requested', () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      const p = getVitePlugin({ custom: { families: [myFont], injectTo: 'body' } })
+
+      expect(callTransformIndexHtml(p, fontBundle()).map(t => t.injectTo)).toEqual(['body'])
+    })
+
+    it('prefixes font links with the configured base', () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      const p = getVitePlugin({ custom: { families: [myFont] } }, { base: '/sub/' })
+
+      expect(callTransformIndexHtml(p, fontBundle()).map(t => t.attrs?.href)).toEqual(['/sub/assets/MyFont-Bold-abc123.woff2'])
+    })
+
+    it.each([
+      ['an array', (tags: any[]) => tags.slice(1), ['/assets/MyFont-Bold-abc123.woff2']],
+      ['true', () => true, ['https://use.typekit.net/abc.css', '/assets/MyFont-Bold-abc123.woff2']],
+      ['false', () => false, []],
+    ])('applies linkFilter returning %s to every link', (_, linkFilter, hrefs) => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      const p = getVitePlugin({ typekit: { id: 'abc' }, custom: { families: [myFont], linkFilter } })
+
+      expect(callTransformIndexHtml(p, fontBundle()).map(t => t.attrs?.href)).toEqual(hrefs)
+    })
+  })
+
+  describe('vitepress', () => {
+    it('adds head entries to the VitePress site config instead of the HTML', () => {
+      vi.mocked(globSync).mockReturnValue(['/root/public/fonts/MyFont-Bold.woff2'])
+      const head: unknown[] = []
+      vi.stubGlobal('VITEPRESS_CONFIG', { site: { head } })
+      const p = getVitePlugin({
+        google: { families: ['Roboto'], preconnect: false },
+        custom: { families: [{ name: 'MyFont', src: 'public/fonts/MyFont-Bold.*' }] },
+      })
+
+      p.vite.generateBundle({}, createBundle({
+        'assets/MyFont-Bold-abc123.woff2': {
+          type: 'asset',
+          fileName: 'assets/MyFont-Bold-abc123.woff2',
+          originalFileNames: ['public/fonts/MyFont-Bold.woff2'],
+        },
+      }))
+
+      expect(head).toEqual([
+        // deferred stylesheets become plain stylesheets: VitePress head entries cannot run onload
+        ['link', { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Roboto&display=swap' }],
+        ['link', { rel: 'preload', as: 'font', type: 'font/woff2', href: '/assets/MyFont-Bold-abc123.woff2', crossorigin: 'anonymous' }],
+      ])
+    })
+  })
 })

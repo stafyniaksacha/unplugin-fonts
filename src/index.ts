@@ -1,3 +1,4 @@
+import type { HtmlTagDescriptor } from 'vite'
 import type { CustomFonts, Options } from './types.js'
 import MagicString from 'magic-string'
 import { basename as _basename, extname, join } from 'pathe'
@@ -96,42 +97,10 @@ export default createUnplugin<Options | undefined>((userOptions) => {
       transformIndexHtml: {
         order: 'post',
         handler: (html, ctx) => {
-          const tags = getHeadLinkTags(options)
-          const customBasenames = resolveCustomFontBasenames(options.custom, root)
-          const files = Object.entries(ctx.bundle ?? {})
-            .filter(([key, info]) => {
-              if (!fontFileRegex.test(key))
-                return false
-              if (customBasenames.size === 0)
-                return false
-              const asset = info as { originalFileNames?: string[] }
-              return (asset.originalFileNames ?? []).some((name) => {
-                return customBasenames.has(_basename(name, extname(name)))
-              })
-            })
-            .map(([key]) => key)
-          const { prefetch: wantPrefetch, preload: wantPreload } = options?.custom || {}
-          for (const file of files) {
-            if (!(
-              wantPrefetch === true || wantPreload === true
-              || (wantPrefetch === undefined && wantPreload === undefined)
-            )) {
-              continue
-            }
-
-            const ext = extname(file)
-            tags.push({
-              tag: 'link',
-              injectTo: options?.custom?.injectTo ?? 'head-prepend',
-              attrs: {
-                rel: options?.custom?.prefetch ? 'prefetch' : 'preload',
-                as: 'font',
-                type: `font/${ext.replace('.', '')}`,
-                href: join(base, file),
-                crossorigin: 'anonymous',
-              },
-            })
-          }
+          const tags = [
+            ...getHeadLinkTags(options),
+            ...bundledFontLinks(options, root, base, ctx.bundle ?? {}),
+          ]
           // Inline @font-face rules from bundled CSS for faster LCP
           if (options.inlineFontFace) {
             const fontFaceRegex = /@font-face\s*\{[^}]*\}/g
@@ -155,17 +124,7 @@ export default createUnplugin<Options | undefined>((userOptions) => {
             }
           }
 
-          let tagsReturned = tags
-          if (options?.custom?.linkFilter) {
-            const newTags = options?.custom?.linkFilter(tags)
-            if (Array.isArray(newTags)) {
-              tagsReturned = newTags
-            }
-            else {
-              tagsReturned = newTags ? tags : []
-            }
-          }
-          return tagsReturned
+          return applyLinkFilter(tags, options.custom?.linkFilter)
         },
       },
     },
@@ -173,6 +132,59 @@ export default createUnplugin<Options | undefined>((userOptions) => {
 })
 
 let vitepressInjected = false
+
+/**
+ * `<link>` tags preloading the custom font files emitted in the bundle.
+ */
+function bundledFontLinks(options: Options, root: string, base: string, bundle: Record<string, unknown>): HtmlTagDescriptor[] {
+  const customBasenames = resolveCustomFontBasenames(options.custom, root)
+  if (customBasenames.size === 0)
+    return []
+
+  const { prefetch: wantPrefetch, preload: wantPreload } = options.custom || {}
+  if (!(
+    wantPrefetch === true || wantPreload === true
+    || (wantPrefetch === undefined && wantPreload === undefined)
+  )) {
+    return []
+  }
+
+  return Object.entries(bundle)
+    .filter(([key, info]) => {
+      if (!fontFileRegex.test(key))
+        return false
+      const asset = info as { originalFileNames?: string[] }
+      return (asset.originalFileNames ?? []).some((name) => {
+        return customBasenames.has(_basename(name, extname(name)))
+      })
+    })
+    .map(([file]) => ({
+      tag: 'link',
+      injectTo: options.custom?.injectTo ?? 'head-prepend',
+      attrs: {
+        rel: options.custom?.prefetch ? 'prefetch' : 'preload',
+        as: 'font',
+        type: `font/${extname(file).replace('.', '')}`,
+        href: join(base, file),
+        crossorigin: 'anonymous',
+      },
+    }))
+}
+
+/**
+ * Apply the user's `linkFilter`: an array replaces the tags, a boolean keeps or drops them all.
+ */
+function applyLinkFilter(tags: HtmlTagDescriptor[], linkFilter: CustomFonts['linkFilter']) {
+  if (!linkFilter)
+    return tags
+
+  const filtered = linkFilter(tags)
+  if (Array.isArray(filtered))
+    return filtered
+
+  return filtered ? tags : []
+}
+
 function resolveCustomFontBasenames(customOptions: CustomFonts | undefined, root: string): Set<string> {
   if (!customOptions)
     return new Set()
@@ -196,54 +208,12 @@ function generateVitepressBundle(
     return
   vitepressInjected = true
 
-  const tags = getHeadLinkTags(options)
-  const customBasenames = resolveCustomFontBasenames(options.custom, root)
-  const files = Object.entries(bundle ?? {})
-    .filter(([key, info]: [string, any]) => {
-      if (!fontFileRegex.test(key))
-        return false
-      if (customBasenames.size === 0)
-        return false
-      return (info.originalFileNames ?? []).some((name: string) => {
-        return customBasenames.has(_basename(name, extname(name)))
-      })
-    })
-    .map(([key]: [string, any]) => key)
-  const { prefetch: wantPrefetch, preload: wantPreload } = options?.custom || {}
-  for (const file of files) {
-    if (!(
-      wantPrefetch === true || wantPreload === true
-      || (wantPrefetch === undefined && wantPreload === undefined)
-    )) {
-      continue
-    }
+  const tags = applyLinkFilter([
+    ...getHeadLinkTags(options),
+    ...bundledFontLinks(options, root, base, bundle ?? {}),
+  ], options.custom?.linkFilter)
 
-    const ext = extname(file)
-    tags.push({
-      tag: 'link',
-      injectTo: options.custom?.injectTo ?? 'head-prepend',
-      attrs: {
-        rel: options.custom?.prefetch ? 'prefetch' : 'preload',
-        as: 'font',
-        type: `font/${ext.replace('.', '')}`,
-        href: join(base, file),
-        crossorigin: 'anonymous',
-      },
-    })
-  }
-
-  let tagsReturned = tags
-  if (options?.custom?.linkFilter) {
-    const newTags = options?.custom?.linkFilter(tags)
-    if (Array.isArray(newTags)) {
-      tagsReturned = newTags
-    }
-    else {
-      tagsReturned = newTags ? tags : []
-    }
-  }
-
-  for (const tag of tagsReturned) {
+  for (const tag of tags) {
     vitepressConfig?.site?.head?.push([
       tag.tag,
       tag.attrs?.onload === 'this.rel=\'stylesheet\''
