@@ -1,9 +1,9 @@
 import type { HtmlTagDescriptor } from 'vite'
 import type { CustomFonts, Options } from './types.js'
 import MagicString from 'magic-string'
-import { basename as _basename, extname, join } from 'pathe'
+import { basename as _basename, extname } from 'pathe'
 import { createUnplugin } from 'unplugin'
-import { customVirtualModule, resolveFontFiles, resolveUserOption } from './loaders/custom.js'
+import { customVirtualModule, joinURL, resolveFontFiles, resolveUserOption } from './loaders/custom.js'
 import { collectFallbackNames, generateAllFallbacks, transformFontFamilyDeclarations } from './loaders/fallback.js'
 import { fontsourceImports, fontsourceVirtualModule } from './loaders/fontsource.js'
 import { getHeadLinkTags } from './loaders/index.js'
@@ -15,11 +15,16 @@ const virtualModuleId = 'unplugin-fonts/head'
 const resolvedVirtualModuleId = `\0${virtualModuleId}`
 
 const fontFileRegex = /\.(?:woff2?|ttf|eot|otf)(?:\?.*)?$/i
+const fontFaceRegex = /@font-face\s*\{[^}]*\}/g
 
 export default createUnplugin<Options | undefined>((userOptions) => {
   const options = userOptions || {}
   let root: string
   let base: string
+  let vitepressInjected = false
+  // A multi-page build transforms every HTML page against the same bundle: the
+  // first page moves the @font-face rules out of the CSS, the others reuse them.
+  const inlinedFontFaces = new WeakMap<object, string[]>()
 
   const fallbackNames = collectFallbackNames(options)
 
@@ -83,7 +88,11 @@ export default createUnplugin<Options | undefined>((userOptions) => {
       },
       generateBundle(_options, bundle) {
         if ('VITEPRESS_CONFIG' in globalThis) {
-          generateVitepressBundle(options, base, root, bundle, (globalThis as any).VITEPRESS_CONFIG)
+          // VitePress runs client and server builds with the same plugin instance.
+          if (!vitepressInjected) {
+            vitepressInjected = true
+            generateVitepressBundle(options, base, root, bundle, (globalThis as any).VITEPRESS_CONFIG)
+          }
           return
         }
 
@@ -102,18 +111,11 @@ export default createUnplugin<Options | undefined>((userOptions) => {
             ...bundledFontLinks(options, root, base, ctx.bundle ?? {}),
           ]
           // Inline @font-face rules from bundled CSS for faster LCP
-          if (options.inlineFontFace) {
-            const fontFaceRegex = /@font-face\s*\{[^}]*\}/g
-            const fontFaceRules: string[] = []
-            for (const info of Object.values(ctx.bundle ?? {})) {
-              if (info.type === 'asset' && typeof info.fileName === 'string' && info.fileName.endsWith('.css')) {
-                const css = typeof info.source === 'string' ? info.source : ''
-                const matches = css.match(fontFaceRegex)
-                if (matches) {
-                  fontFaceRules.push(...matches)
-                  info.source = css.replace(fontFaceRegex, '')
-                }
-              }
+          if (options.inlineFontFace && ctx.bundle) {
+            let fontFaceRules = inlinedFontFaces.get(ctx.bundle)
+            if (!fontFaceRules) {
+              fontFaceRules = extractFontFaceRules(ctx.bundle)
+              inlinedFontFaces.set(ctx.bundle, fontFaceRules)
             }
             if (fontFaceRules.length > 0) {
               tags.push({
@@ -131,41 +133,68 @@ export default createUnplugin<Options | undefined>((userOptions) => {
   }
 })
 
-let vitepressInjected = false
+/**
+ * Move the @font-face rules of every CSS asset out of the bundle.
+ */
+function extractFontFaceRules(bundle: Record<string, { type: string, fileName: string, source?: unknown }>) {
+  const rules: string[] = []
+  for (const info of Object.values(bundle)) {
+    if (info.type !== 'asset' || !info.fileName.endsWith('.css') || typeof info.source !== 'string')
+      continue
+    const matches = info.source.match(fontFaceRegex)
+    if (matches) {
+      rules.push(...matches)
+      info.source = info.source.replace(fontFaceRegex, '')
+    }
+  }
+  return rules
+}
 
 /**
  * `<link>` tags preloading the custom font files emitted in the bundle.
  */
 function bundledFontLinks(options: Options, root: string, base: string, bundle: Record<string, unknown>): HtmlTagDescriptor[] {
-  const customBasenames = resolveCustomFontBasenames(options.custom, root)
-  if (customBasenames.size === 0)
+  if (!options.custom)
     return []
 
-  const { prefetch: wantPrefetch, preload: wantPreload } = options.custom || {}
-  if (!(
-    wantPrefetch === true || wantPreload === true
-    || (wantPrefetch === undefined && wantPreload === undefined)
-  )) {
+  const { preload, prefetch, injectTo } = resolveUserOption(options.custom)
+  if (!preload && !prefetch)
     return []
+
+  const faces = resolveCustomFontFaces(options.custom, root)
+  if (faces.size === 0)
+    return []
+
+  // One preload per face: the bundled file of its first @font-face source,
+  // which is the one browsers download.
+  const preferred = new Map<string, { file: string, rank: number }>()
+  for (const [file, info] of Object.entries(bundle)) {
+    if (!fontFileRegex.test(file))
+      continue
+    // Rollup 4 records `originalFileNames`, Rollup 3 (Vite 4) only the asset `name`.
+    const asset = info as { originalFileNames?: string[], names?: string[], name?: string }
+    for (const source of asset.originalFileNames ?? asset.names ?? (asset.name ? [asset.name] : [])) {
+      const ext = extname(source)
+      const basename = _basename(source, ext)
+      const extensions = faces.get(basename)
+      if (!extensions)
+        continue
+      const rank = extensions.includes(ext) ? extensions.indexOf(ext) : extensions.length
+      const current = preferred.get(basename)
+      if (!current || rank < current.rank)
+        preferred.set(basename, { file, rank })
+    }
   }
 
-  return Object.entries(bundle)
-    .filter(([key, info]) => {
-      if (!fontFileRegex.test(key))
-        return false
-      const asset = info as { originalFileNames?: string[] }
-      return (asset.originalFileNames ?? []).some((name) => {
-        return customBasenames.has(_basename(name, extname(name)))
-      })
-    })
-    .map(([file]) => ({
+  return [...preferred.values()]
+    .map(({ file }) => ({
       tag: 'link',
-      injectTo: options.custom?.injectTo ?? 'head-prepend',
+      injectTo,
       attrs: {
-        rel: options.custom?.prefetch ? 'prefetch' : 'preload',
+        rel: prefetch ? 'prefetch' : 'preload',
         as: 'font',
         type: `font/${extname(file).replace('.', '')}`,
-        href: join(base, file),
+        href: joinURL(base, file),
         crossorigin: 'anonymous',
       },
     }))
@@ -185,16 +214,19 @@ function applyLinkFilter(tags: HtmlTagDescriptor[], linkFilter: CustomFonts['lin
   return filtered ? tags : []
 }
 
-function resolveCustomFontBasenames(customOptions: CustomFonts | undefined, root: string): Set<string> {
+/**
+ * Extensions of each custom font face in `@font-face` source order, keyed by basename.
+ */
+function resolveCustomFontFaces(customOptions: CustomFonts | undefined, root: string): Map<string, string[]> {
   if (!customOptions)
-    return new Set()
+    return new Map()
   const resolved = resolveUserOption(customOptions)
-  const basenames = new Set<string>()
+  const faces = new Map<string, string[]>()
   for (const family of resolved.families) {
     for (const face of resolveFontFiles(family, resolved, root))
-      basenames.add(face.basename)
+      faces.set(face.basename, face.files.map(file => file.ext))
   }
-  return basenames
+  return faces
 }
 
 function generateVitepressBundle(
@@ -204,10 +236,6 @@ function generateVitepressBundle(
   bundle: any,
   vitepressConfig: any,
 ) {
-  if (vitepressInjected)
-    return
-  vitepressInjected = true
-
   const tags = applyLinkFilter([
     ...getHeadLinkTags(options),
     ...bundledFontLinks(options, root, base, bundle ?? {}),
