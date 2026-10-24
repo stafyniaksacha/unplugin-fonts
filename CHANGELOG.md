@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.1.0](https://github.com/stafyniaksacha/unplugin-fonts/compare/v2.0.0...v2.1.0) (2026-10-24)
+
+
+### Features
+
+* preload custom fonts served from the public directory ([#107](https://github.com/stafyniaksacha/unplugin-fonts/issues/107)) ([2e756c6](https://github.com/stafyniaksacha/unplugin-fonts/commit/2e756c6b92910af5b90cf3162b789e1b8491d119))
+
+
+### Bug Fixes
+
+* **custom:** strip public prefix relative to root and emit woff2 first ([#104](https://github.com/stafyniaksacha/unplugin-fonts/issues/104)) ([6983fad](https://github.com/stafyniaksacha/unplugin-fonts/commit/6983fadf2b8e7ccf9422638e6bc339abd5b19c9a))
+* **examples:** mark vite-4 as ESM so vite.config.ts can load the plugin ([e74ac43](https://github.com/stafyniaksacha/unplugin-fonts/commit/e74ac430cd695ae3d35c703bbcd80fd452c31d41))
+* **examples:** use SvelteKit TypeScript check config ([#99](https://github.com/stafyniaksacha/unplugin-fonts/issues/99)) ([f96fb2c](https://github.com/stafyniaksacha/unplugin-fonts/commit/f96fb2c41714a70478bb51f4031b560342905c17))
+* **fallback:** match variable, nested, unquoted and case-insensitive families ([#103](https://github.com/stafyniaksacha/unplugin-fonts/issues/103)) ([e5b7dcb](https://github.com/stafyniaksacha/unplugin-fonts/commit/e5b7dcba15a3242fb772ee168f6949a080c9dcf2))
+* **fontsource:** ignore disabled variable axes when picking the stylesheet ([#102](https://github.com/stafyniaksacha/unplugin-fonts/issues/102)) ([e312a15](https://github.com/stafyniaksacha/unplugin-fonts/commit/e312a15f149a7a29ac5ecb14c5877e9b5096b349))
+* **fontsource:** read installed font metrics for fallbacks ([#100](https://github.com/stafyniaksacha/unplugin-fonts/issues/100)) ([7495774](https://github.com/stafyniaksacha/unplugin-fonts/commit/7495774354de137682b480b27e67f5ff08bbea24))
+* **google:** encode text subsetting query values ([#97](https://github.com/stafyniaksacha/unplugin-fonts/issues/97)) ([f176e5f](https://github.com/stafyniaksacha/unplugin-fonts/commit/f176e5f668ec2f4b03cf3aa838a8d100c8eb2ab9))
+* honor preload defaults, CDN bases, Vite 4 assets and MPA inlining ([#106](https://github.com/stafyniaksacha/unplugin-fonts/issues/106)) ([76f3eee](https://github.com/stafyniaksacha/unplugin-fonts/commit/76f3eee6e8e4e1c451a3985b371dea2026f8c57b))
+
 ## [2.0.0](https://github.com/stafyniaksacha/unplugin-fonts/compare/v1.4.0...v2.0.0) (2026-04-06)
 
 
